@@ -21,7 +21,7 @@
               v-model="newFeature.id"
               type="text"
               placeholder="FEAT-001"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+              class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none px-3 py-2 text-gray-900 bg-white placeholder-gray-400"
               required
             />
           </div>
@@ -31,7 +31,7 @@
               v-model="newFeature.title"
               type="text"
               placeholder="Feature title"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+              class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none px-3 py-2 text-gray-900 bg-white placeholder-gray-400"
               required
             />
           </div>
@@ -41,7 +41,7 @@
               v-model="newFeature.description"
               rows="4"
               placeholder="Detailed feature description"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+              class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none px-3 py-2 text-gray-900 bg-white placeholder-gray-400"
               required
             ></textarea>
           </div>

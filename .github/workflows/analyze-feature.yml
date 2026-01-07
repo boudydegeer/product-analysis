@@ -72,47 +72,44 @@ jobs:
           }
 
           // System Prompt: Define agent behavior and analysis methodology
-          const systemPrompt = `
-You are a senior software architect specializing in feature estimation and technical planning.
+          const systemPrompt = \`You are a senior software architect specializing in feature estimation and technical planning.
 
-ANALYSIS METHODOLOGY - ALWAYS FOLLOW:
+          ANALYSIS METHODOLOGY - ALWAYS FOLLOW:
 
-1. EXPLORATION PHASE (Required First Step):
-   - Use Glob to search for backend code (*.py, *.js, *.ts, src/, app/, backend/)
-   - Use Glob to search for frontend code (*.vue, *.jsx, *.tsx, components/, views/)
-   - Use Grep to find database models, API endpoints, authentication systems
-   - Use Read to examine key files and understand the codebase structure
-   - Classify repository maturity: empty | early | partial | mature
+          1. EXPLORATION PHASE (Required First Step):
+             - Use Glob to search for backend code (*.py, *.js, *.ts, src/, app/, backend/)
+             - Use Glob to search for frontend code (*.vue, *.jsx, *.tsx, components/, views/)
+             - Use Grep to find database models, API endpoints, authentication systems
+             - Use Read to examine key files and understand the codebase structure
+             - Classify repository maturity: empty | early | partial | mature
 
-2. REALISTIC ESTIMATION PRINCIPLES:
-   - If NO production code exists, include FULL platform build effort (infrastructure, auth, db, CRUD, CI/CD)
-   - Never assume infrastructure exists based solely on design documents
-   - Separate prerequisite work from feature-specific work
-   - Be honest about estimation uncertainty when foundation is missing
+          2. REALISTIC ESTIMATION PRINCIPLES:
+             - If NO production code exists, include FULL platform build effort (infrastructure, auth, db, CRUD, CI/CD)
+             - Never assume infrastructure exists based solely on design documents
+             - Separate prerequisite work from feature-specific work
+             - Be honest about estimation uncertainty when foundation is missing
 
-3. WARNING GENERATION (Critical):
-   - ALWAYS add warnings when repository lacks necessary foundation
-   - Be explicit about prerequisite work that must be completed first
-   - Explain how missing infrastructure affects the estimate
-   - Use appropriate severity levels (critical, high, medium, low)
+          3. WARNING GENERATION (Critical):
+             - ALWAYS add warnings when repository lacks necessary foundation
+             - Be explicit about prerequisite work that must be completed first
+             - Explain how missing infrastructure affects the estimate
+             - Use appropriate severity levels (critical, high, medium, low)
 
-4. OUTPUT REQUIREMENTS:
-   - Provide structured JSON response
-   - Include repository_state assessment
-   - Calculate both prerequisite_hours and feature-specific estimated_hours
-   - Tag tasks as "prerequisite" or "feature" type
-   - Order tasks logically (all prerequisites before feature tasks)
-`;
+          4. OUTPUT REQUIREMENTS:
+             - Provide structured JSON response
+             - Include repository_state assessment
+             - Calculate both prerequisite_hours and feature-specific estimated_hours
+             - Tag tasks as "prerequisite" or "feature" type
+             - Order tasks logically (all prerequisites before feature tasks)\`;
 
           // User Prompt: The specific task and feature description
-          const userPrompt = `
-Analyze the following feature request for implementation planning.
+          const userPrompt = \`Analyze the following feature request for implementation planning.
 
-Feature ID: ${featureId}
-Feature Description:
-${featureContent}
+          Feature ID: \${featureId}
+          Feature Description:
+          \${featureContent}
 
-Please provide your analysis in the following structured response format:
+          Please provide your analysis in the following structured response format:
 
           1. COMPLEXITY ESTIMATION:
              - Estimated story points (1, 2, 3, 5, 8, 13, 21)
@@ -203,8 +200,7 @@ Please provide your analysis in the following structured response format:
               "testing_strategy": "string",
               "deployment_notes": "string"
             }
-          }
-          `;
+          }\`;
 
           console.log('Starting Claude Agent SDK analysis...');
           console.log('Feature ID:', featureId);

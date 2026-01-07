@@ -1,7 +1,16 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import event
+from sqlalchemy.pool import NullPool
 
 from app.main import app
+from app.database import get_db
+from app.models import Base
+
+
+# Test database URL
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
 @pytest.fixture
@@ -11,8 +20,67 @@ def anyio_backend():
 
 
 @pytest.fixture
-async def async_client():
+async def test_db():
+    """Create a test database with tables."""
+    # Create async engine for testing with in-memory SQLite
+    engine = create_async_engine(
+        TEST_DATABASE_URL,
+        echo=False,
+        poolclass=NullPool,
+    )
+
+    # Create tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # Create session factory
+    async_session_maker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+
+    yield async_session_maker
+
+    # Drop tables and dispose engine
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
+
+
+@pytest.fixture
+async def async_client(test_db):
     """Create an async test client for the FastAPI app."""
-    transport = ASGITransport(app=app)
+    # Import the main module to avoid starting scheduler during tests
+    from fastapi import FastAPI
+    from app.api.features import router as features_router
+    from app.api.webhooks import router as webhooks_router
+    from app.config import settings
+
+    # Create a test app without lifespan to avoid starting scheduler
+    test_app = FastAPI(title=settings.app_name, debug=settings.debug)
+    test_app.include_router(features_router)
+    test_app.include_router(webhooks_router)
+
+    # Add health endpoint for tests
+    @test_app.get("/health")
+    async def health_check():
+        """Health check endpoint."""
+        return {"status": "healthy", "app": settings.app_name}
+
+    async def override_get_db():
+        async with test_db() as session:
+            try:
+                yield session
+            finally:
+                await session.close()
+
+    test_app.dependency_overrides[get_db] = override_get_db
+
+    transport = ASGITransport(app=test_app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+    test_app.dependency_overrides.clear()

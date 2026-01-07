@@ -78,12 +78,16 @@ class GitHubService:
     async def trigger_analysis_workflow(
         self,
         feature_id: UUID,
+        feature_description: str,
+        callback_url: str | None = None,
         ref: str = "main",
     ) -> int:
         """Trigger the feature analysis workflow.
 
         Args:
             feature_id: UUID of the feature to analyze.
+            feature_description: Description of the feature to analyze.
+            callback_url: Optional URL to POST results to.
             ref: Git ref (branch/tag) to run the workflow on.
 
         Returns:
@@ -94,11 +98,18 @@ class GitHubService:
         """
         url = f"/repos/{self.owner}/{self.repo_name}/actions/workflows/{self.WORKFLOW_FILE}/dispatches"
 
+        inputs = {
+            "feature_id": str(feature_id),
+            "feature_description": feature_description,
+        }
+
+        # Only include callback_url if provided
+        if callback_url:
+            inputs["callback_url"] = callback_url
+
         payload = {
             "ref": ref,
-            "inputs": {
-                "feature_id": str(feature_id),
-            },
+            "inputs": inputs,
         }
 
         try:

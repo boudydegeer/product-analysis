@@ -1,121 +1,122 @@
 <template>
   <div class="space-y-4">
     <div class="flex justify-between items-center">
-      <h2 class="text-2xl font-semibold text-gray-900">Features</h2>
-      <button
-        @click="showCreateForm = true"
-        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
+      <h2 class="text-2xl font-semibold">Features</h2>
+      <Button @click="showCreateForm = true">
+        <Plus class="mr-2 h-4 w-4" />
         New Feature
-      </button>
+      </Button>
     </div>
 
-    <!-- Create Form Modal -->
-    <div v-if="showCreateForm" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div class="bg-white rounded-lg p-6 max-w-md w-full">
-        <h3 class="text-lg font-semibold mb-4">Create New Feature</h3>
-        <form @submit.prevent="handleCreate" class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Feature ID</label>
-            <input
-              v-model="newFeature.id"
-              type="text"
-              placeholder="FEAT-001"
-              class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none px-3 py-2 text-gray-900 bg-white placeholder-gray-400"
-              required
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Name</label>
-            <input
-              v-model="newFeature.name"
-              type="text"
-              placeholder="Feature name"
-              class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none px-3 py-2 text-gray-900 bg-white placeholder-gray-400"
-              required
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Description</label>
-            <textarea
-              v-model="newFeature.description"
-              rows="4"
-              placeholder="Detailed feature description"
-              class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none px-3 py-2 text-gray-900 bg-white placeholder-gray-400"
-              required
-            ></textarea>
-          </div>
-          <div class="flex justify-end space-x-2">
-            <button
-              type="button"
-              @click="showCreateForm = false"
-              class="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Create
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <!-- Create Form Dialog -->
+    <DialogRoot v-model:open="showCreateForm">
+      <DialogContent class="sm:max-w-[425px]">
+        <DialogTitle class="text-lg font-semibold">Create New Feature</DialogTitle>
+        <DialogDescription class="text-sm text-muted-foreground">
+          Add a new feature to your product analysis
+        </DialogDescription>
+        <div class="space-y-4">
+          <form @submit.prevent="handleCreate" class="space-y-4">
+            <div class="space-y-2">
+              <Label for="feature-id">Feature ID</Label>
+              <Input
+                id="feature-id"
+                v-model="newFeature.id"
+                placeholder="FEAT-001"
+                required
+              />
+            </div>
+            <div class="space-y-2">
+              <Label for="feature-name">Name</Label>
+              <Input
+                id="feature-name"
+                v-model="newFeature.name"
+                placeholder="Feature name"
+                required
+              />
+            </div>
+            <div class="space-y-2">
+              <Label for="feature-description">Description</Label>
+              <Textarea
+                id="feature-description"
+                v-model="newFeature.description"
+                placeholder="Detailed feature description"
+                rows="4"
+                required
+              />
+            </div>
+            <div class="flex justify-end space-x-2">
+              <Button type="button" variant="outline" @click="showCreateForm = false">
+                Cancel
+              </Button>
+              <Button type="submit">
+                Create
+              </Button>
+            </div>
+          </form>
+        </div>
+      </DialogContent>
+    </DialogRoot>
 
     <!-- Loading State -->
-    <div v-if="store.loading" class="text-center py-8">
-      <p class="text-gray-500">Loading features...</p>
-    </div>
+    <Card v-if="store.loading" class="p-8">
+      <p class="text-center text-muted-foreground">Loading features...</p>
+    </Card>
 
     <!-- Error State -->
-    <div v-else-if="store.error" class="bg-red-50 border border-red-200 rounded-md p-4">
-      <p class="text-red-800">{{ store.error }}</p>
-    </div>
+    <Card v-else-if="store.error" class="p-4 border-destructive bg-destructive/10">
+      <p class="text-destructive">{{ store.error }}</p>
+    </Card>
 
     <!-- Feature List -->
-    <div v-else-if="store.features.length > 0" class="bg-white shadow overflow-hidden rounded-md">
-      <ul class="divide-y divide-gray-200">
-        <li v-for="feature in store.features" :key="feature.id" class="p-4 hover:bg-gray-50">
-          <div class="flex items-center justify-between">
-            <div class="flex-1">
-              <div class="flex items-center space-x-2">
-                <h3 class="text-lg font-medium text-gray-900">{{ feature.name }}</h3>
-                <span
-                  class="px-2 py-1 text-xs font-semibold rounded-full"
-                  :class="getStatusClass(feature.status)"
-                >
-                  {{ feature.status }}
-                </span>
-              </div>
-              <p class="text-sm text-gray-500 mt-1">{{ feature.id }}</p>
-              <p class="text-sm text-gray-700 mt-2">{{ feature.description }}</p>
+    <div v-else-if="store.features.length > 0" class="space-y-4">
+      <Card
+        v-for="feature in store.features"
+        :key="feature.id"
+        class="p-6 hover:shadow-md transition-shadow"
+      >
+        <div class="flex items-start justify-between">
+          <div class="flex-1 space-y-2">
+            <div class="flex items-center gap-2">
+              <h3 class="text-lg font-semibold">{{ feature.name }}</h3>
+              <Badge :class="getStatusClass(feature.status)">
+                {{ feature.status }}
+              </Badge>
             </div>
-            <div class="flex space-x-2 ml-4">
-              <button
-                @click="handleAnalyze(feature.id)"
-                :disabled="feature.status === 'analyzing'"
-                class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
-                {{ feature.status === 'analyzing' ? 'Analyzing...' : 'Analyze' }}
-              </button>
-              <button
-                @click="handleDelete(feature.id)"
-                class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-              >
-                Delete
-              </button>
-            </div>
+            <p class="text-sm text-muted-foreground">{{ feature.id }}</p>
+            <p class="text-sm">{{ feature.description }}</p>
           </div>
-        </li>
-      </ul>
+          <div class="flex gap-2 ml-4">
+            <Button
+              @click="handleAnalyze(feature.id)"
+              :disabled="feature.status === 'analyzing'"
+              variant="secondary"
+              size="sm"
+            >
+              {{ feature.status === 'analyzing' ? 'Analyzing...' : 'Analyze' }}
+            </Button>
+            <Button
+              @click="handleDelete(feature.id)"
+              variant="destructive"
+              size="sm"
+            >
+              <Trash2 class="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </Card>
     </div>
 
     <!-- Empty State -->
-    <div v-else class="text-center py-12 bg-white rounded-lg shadow">
-      <p class="text-gray-500">No features yet. Create your first feature to get started!</p>
-    </div>
+    <Card v-else class="p-12">
+      <div class="text-center space-y-2">
+        <p class="text-muted-foreground">No features yet. Create your first feature to get started!</p>
+        <Button @click="showCreateForm = true" class="mt-4">
+          <Plus class="mr-2 h-4 w-4" />
+          Create Feature
+        </Button>
+      </div>
+    </Card>
   </div>
 </template>
 
@@ -123,6 +124,15 @@
 import { ref, onMounted } from 'vue'
 import { useFeaturesStore } from '@/stores/features'
 import type { FeatureStatus } from '@/types/feature'
+import { Plus, Trash2 } from 'lucide-vue-next'
+import Button from '@/components/ui/button.vue'
+import Badge from '@/components/ui/badge.vue'
+import Card from '@/components/ui/card.vue'
+import { DialogRoot, DialogTitle, DialogDescription } from 'radix-vue'
+import DialogContent from '@/components/ui/dialog-content.vue'
+import Input from '@/components/ui/input.vue'
+import Textarea from '@/components/ui/textarea.vue'
+import Label from '@/components/ui/label.vue'
 
 const store = useFeaturesStore()
 const showCreateForm = ref(false)

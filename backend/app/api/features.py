@@ -205,8 +205,15 @@ async def trigger_analysis(
         )
 
     try:
-        # Trigger the analysis workflow
-        run_id = await github_service.trigger_analysis_workflow(feature_id=feature_id)
+        # Construct callback URL (optional - can be None)
+        callback_url = None  # TODO: Set this if you want to receive results via callback
+
+        # Trigger the analysis workflow with required parameters
+        run_id = await github_service.trigger_analysis_workflow(
+            feature_id=feature_id,
+            feature_description=feature.description,
+            callback_url=callback_url,
+        )
 
         # Update feature status and store workflow run ID
         feature.status = FeatureStatus.ANALYZING

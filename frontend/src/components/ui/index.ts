@@ -1,0 +1,8 @@
+export { default as Badge } from './badge.vue'
+export { default as Button } from './button.vue'
+export { default as Card } from './card.vue'
+export { default as DialogContent } from './dialog-content.vue'
+export { default as Input } from './input.vue'
+export { default as Label } from './label.vue'
+export { default as Textarea } from './textarea.vue'
+export { DialogRoot, DialogTrigger, DialogClose } from 'radix-vue'

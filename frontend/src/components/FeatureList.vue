@@ -11,7 +11,7 @@
     <!-- Create Form Dialog -->
     <DialogRoot v-model:open="showCreateForm">
       <DialogContent class="sm:max-w-[425px]">
-        <DialogTitle class="text-lg font-semibold">Create New Feature</DialogTitle>
+        <DialogTitle class="text-lg font-semibold text-foreground">Create New Feature</DialogTitle>
         <DialogDescription class="text-sm text-muted-foreground">
           Add a new feature to your product analysis
         </DialogDescription>

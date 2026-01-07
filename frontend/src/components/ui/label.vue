@@ -9,7 +9,7 @@ const props = defineProps<LabelProps & { class?: HTMLAttributes['class'] }>()
 <template>
   <Label
     v-bind="props"
-    :class="cn('text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70', props.class)"
+    :class="cn('text-sm font-medium leading-none text-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70', props.class)"
   >
     <slot />
   </Label>

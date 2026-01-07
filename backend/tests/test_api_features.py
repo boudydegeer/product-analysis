@@ -513,3 +513,77 @@ class TestTriggerAnalysis:
             # Clean up dependency override
             if get_github_service in app.dependency_overrides:
                 del app.dependency_overrides[get_github_service]
+
+
+# =============================================================================
+# Feature Creation with Webhook Secret Tests
+# =============================================================================
+
+
+class TestFeatureCreationWithWebhook:
+    """Tests for feature creation with webhook secret generation."""
+
+    @pytest.mark.asyncio
+    async def test_create_feature_generates_webhook_secret(
+        self, async_client: AsyncClient, db_session: AsyncSession
+    ):
+        """Creating a feature should automatically generate webhook secret."""
+        response = await async_client.post(
+            "/api/v1/features/",
+            json={
+                "name": "Test Feature",
+                "description": "Test description",
+                "priority": 1,
+            },
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+
+        # Webhook secret should not be exposed in API response
+        assert "webhook_secret" not in data
+
+        # But it should exist in database
+        from sqlalchemy import select
+
+        result = await db_session.execute(select(Feature).where(Feature.id == data["id"]))
+        feature = result.scalar_one()
+
+        assert feature.webhook_secret is not None
+        assert len(feature.webhook_secret) > 20  # Should be reasonably long
+
+    @pytest.mark.asyncio
+    async def test_each_feature_gets_unique_webhook_secret(
+        self, async_client: AsyncClient, db_session: AsyncSession
+    ):
+        """Each feature should get a unique webhook secret."""
+        response1 = await async_client.post(
+            "/api/v1/features/",
+            json={
+                "name": "Feature 1",
+                "description": "Test 1",
+                "priority": 1,
+            },
+        )
+        response2 = await async_client.post(
+            "/api/v1/features/",
+            json={
+                "name": "Feature 2",
+                "description": "Test 2",
+                "priority": 1,
+            },
+        )
+
+        from sqlalchemy import select
+
+        result1 = await db_session.execute(
+            select(Feature).where(Feature.id == response1.json()["id"])
+        )
+        result2 = await db_session.execute(
+            select(Feature).where(Feature.id == response2.json()["id"])
+        )
+
+        feature1 = result1.scalar_one()
+        feature2 = result2.scalar_one()
+
+        assert feature1.webhook_secret != feature2.webhook_secret

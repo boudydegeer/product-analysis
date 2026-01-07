@@ -15,6 +15,7 @@ from app.database import get_db
 from app.models import Feature, FeatureStatus
 from app.schemas import FeatureCreate, FeatureUpdate, FeatureResponse
 from app.services.github_service import GitHubService
+from app.utils.webhook_security import generate_webhook_secret
 
 router = APIRouter(prefix="/api/v1/features", tags=["features"])
 
@@ -48,6 +49,7 @@ async def create_feature(
         description=feature_in.description or "",
         priority=feature_in.priority,
         status=FeatureStatus.PENDING,
+        webhook_secret=generate_webhook_secret(),  # Generate unique webhook secret
     )
 
     db.add(feature)

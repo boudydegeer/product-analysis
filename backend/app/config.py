@@ -25,7 +25,12 @@ class Settings(BaseSettings):
     secret_key: str = "change-this-in-production"
 
     # CORS
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    cors_origins: list[str] = [
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:3000",  # Alternative port
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ]
 
 
 settings = Settings()

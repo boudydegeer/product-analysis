@@ -26,11 +26,11 @@
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700">Title</label>
+            <label class="block text-sm font-medium text-gray-700">Name</label>
             <input
-              v-model="newFeature.title"
+              v-model="newFeature.name"
               type="text"
-              placeholder="Feature title"
+              placeholder="Feature name"
               class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none px-3 py-2 text-gray-900 bg-white placeholder-gray-400"
               required
             />
@@ -81,7 +81,7 @@
           <div class="flex items-center justify-between">
             <div class="flex-1">
               <div class="flex items-center space-x-2">
-                <h3 class="text-lg font-medium text-gray-900">{{ feature.title }}</h3>
+                <h3 class="text-lg font-medium text-gray-900">{{ feature.name }}</h3>
                 <span
                   class="px-2 py-1 text-xs font-semibold rounded-full"
                   :class="getStatusClass(feature.status)"
@@ -128,7 +128,7 @@ const store = useFeaturesStore()
 const showCreateForm = ref(false)
 const newFeature = ref({
   id: '',
-  title: '',
+  name: '',
   description: '',
 })
 
@@ -140,7 +140,7 @@ async function handleCreate() {
   try {
     await store.createFeature(newFeature.value)
     showCreateForm.value = false
-    newFeature.value = { id: '', title: '', description: '' }
+    newFeature.value = { id: '', name: '', description: '' }
   } catch (e) {
     console.error('Failed to create feature:', e)
   }

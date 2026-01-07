@@ -10,7 +10,7 @@ export enum FeatureStatus {
 
 export interface Feature {
   id: string
-  title: string
+  name: string
   description: string
   status: FeatureStatus
   github_workflow_run_id?: string
@@ -20,12 +20,12 @@ export interface Feature {
 
 export interface FeatureCreate {
   id: string
-  title: string
+  name: string
   description: string
 }
 
 export interface FeatureUpdate {
-  title?: string
+  name?: string
   description?: string
   status?: FeatureStatus
 }

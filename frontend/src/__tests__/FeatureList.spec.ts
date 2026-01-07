@@ -22,7 +22,7 @@ import { featureApi } from '@/services/api'
 const mockFeatures: Feature[] = [
   {
     id: 'FEAT-001',
-    title: 'Test Feature 1',
+    name: 'Test Feature 1',
     description: 'Description for feature 1',
     status: FeatureStatus.DRAFT,
     created_at: '2024-01-01T00:00:00Z',
@@ -30,7 +30,7 @@ const mockFeatures: Feature[] = [
   },
   {
     id: 'FEAT-002',
-    title: 'Test Feature 2',
+    name: 'Test Feature 2',
     description: 'Description for feature 2',
     status: FeatureStatus.ANALYZING,
     created_at: '2024-01-02T00:00:00Z',
@@ -38,7 +38,7 @@ const mockFeatures: Feature[] = [
   },
   {
     id: 'FEAT-003',
-    title: 'Test Feature 3',
+    name: 'Test Feature 3',
     description: 'Description for feature 3',
     status: FeatureStatus.ANALYZED,
     created_at: '2024-01-03T00:00:00Z',
@@ -118,7 +118,7 @@ describe('useFeaturesStore', () => {
       const store = useFeaturesStore()
       const newFeatureData: FeatureCreate = {
         id: 'FEAT-004',
-        title: 'New Feature',
+        name: 'New Feature',
         description: 'New feature description',
       }
       const createdFeature: Feature = {
@@ -143,7 +143,7 @@ describe('useFeaturesStore', () => {
 
       await expect(store.createFeature({
         id: 'FEAT-005',
-        title: 'Failed Feature',
+        name: 'Failed Feature',
         description: 'Will fail',
       })).rejects.toThrow()
 

@@ -51,7 +51,7 @@ describe('TypeScript Types', () => {
     it('matches backend schema', () => {
       const feature: Feature = {
         id: 'FEAT-001',
-        title: 'Test Feature',
+        name: 'Test Feature',
         description: 'Test description',
         status: FeatureStatus.DRAFT,
         created_at: '2024-01-01T00:00:00Z',
@@ -59,7 +59,7 @@ describe('TypeScript Types', () => {
       }
 
       expect(feature.id).toBe('FEAT-001')
-      expect(feature.title).toBe('Test Feature')
+      expect(feature.name).toBe('Test Feature')
       expect(feature.description).toBe('Test description')
       expect(feature.status).toBe(FeatureStatus.DRAFT)
       expect(feature.created_at).toBeDefined()
@@ -69,7 +69,7 @@ describe('TypeScript Types', () => {
     it('supports optional github_workflow_run_id', () => {
       const feature: Feature = {
         id: 'FEAT-002',
-        title: 'Feature with workflow',
+        name: 'Feature with workflow',
         description: 'Description',
         status: FeatureStatus.ANALYZING,
         github_workflow_run_id: '12345',
@@ -82,15 +82,15 @@ describe('TypeScript Types', () => {
   })
 
   describe('FeatureCreate interface', () => {
-    it('requires id, title, and description', () => {
+    it('requires id, name, and description', () => {
       const createData: FeatureCreate = {
         id: 'FEAT-001',
-        title: 'New Feature',
+        name: 'New Feature',
         description: 'Feature description',
       }
 
       expect(createData.id).toBe('FEAT-001')
-      expect(createData.title).toBe('New Feature')
+      expect(createData.name).toBe('New Feature')
       expect(createData.description).toBe('Feature description')
     })
   })
@@ -99,17 +99,17 @@ describe('TypeScript Types', () => {
     it('has all fields optional', () => {
       const updateData: FeatureUpdate = {}
 
-      expect(updateData.title).toBeUndefined()
+      expect(updateData.name).toBeUndefined()
       expect(updateData.description).toBeUndefined()
       expect(updateData.status).toBeUndefined()
     })
 
     it('allows partial updates', () => {
       const updateData: FeatureUpdate = {
-        title: 'Updated Title',
+        name: 'Updated Name',
       }
 
-      expect(updateData.title).toBe('Updated Title')
+      expect(updateData.name).toBe('Updated Name')
       expect(updateData.description).toBeUndefined()
     })
   })
@@ -172,7 +172,7 @@ describe('API Client (featuresApi)', () => {
       const mockFeatures: Feature[] = [
         {
           id: 'FEAT-001',
-          title: 'Feature 1',
+          name: 'Feature 1',
           description: 'Description 1',
           status: FeatureStatus.DRAFT,
           created_at: '2024-01-01T00:00:00Z',
@@ -180,7 +180,7 @@ describe('API Client (featuresApi)', () => {
         },
         {
           id: 'FEAT-002',
-          title: 'Feature 2',
+          name: 'Feature 2',
           description: 'Description 2',
           status: FeatureStatus.COMPLETED,
           created_at: '2024-01-02T00:00:00Z',
@@ -203,7 +203,7 @@ describe('API Client (featuresApi)', () => {
     it('calls GET /api/features/{id} and returns Feature', async () => {
       const mockFeature: Feature = {
         id: 'FEAT-001',
-        title: 'Feature 1',
+        name: 'Feature 1',
         description: 'Description 1',
         status: FeatureStatus.DRAFT,
         created_at: '2024-01-01T00:00:00Z',
@@ -217,7 +217,7 @@ describe('API Client (featuresApi)', () => {
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/features/FEAT-001')
       expect(result).toEqual(mockFeature)
       expect(result.id).toBe('FEAT-001')
-      expect(result.title).toBe('Feature 1')
+      expect(result.name).toBe('Feature 1')
     })
   })
 
@@ -225,12 +225,12 @@ describe('API Client (featuresApi)', () => {
     it('calls POST /api/features and returns Feature', async () => {
       const createData: FeatureCreate = {
         id: 'FEAT-001',
-        title: 'New Feature',
+        name: 'New Feature',
         description: 'New description',
       }
       const mockFeature: Feature = {
         id: 'FEAT-001',
-        title: 'New Feature',
+        name: 'New Feature',
         description: 'New description',
         status: FeatureStatus.DRAFT,
         created_at: '2024-01-01T00:00:00Z',
@@ -251,11 +251,11 @@ describe('API Client (featuresApi)', () => {
   describe('update(id: string, data: FeatureUpdate)', () => {
     it('calls PATCH /api/features/{id} and returns Feature', async () => {
       const updateData: FeatureUpdate = {
-        title: 'Updated Feature',
+        name: 'Updated Feature',
       }
       const mockFeature: Feature = {
         id: 'FEAT-001',
-        title: 'Updated Feature',
+        name: 'Updated Feature',
         description: 'Original description',
         status: FeatureStatus.DRAFT,
         created_at: '2024-01-01T00:00:00Z',
@@ -276,7 +276,7 @@ describe('API Client (featuresApi)', () => {
       }
       const mockFeature: Feature = {
         id: 'FEAT-001',
-        title: 'Feature 1',
+        name: 'Feature 1',
         description: 'Description 1',
         status: FeatureStatus.COMPLETED,
         created_at: '2024-01-01T00:00:00Z',

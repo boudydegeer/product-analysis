@@ -34,7 +34,7 @@ jobs:
 
       - name: Install Claude Agent SDK
         run: |
-          npm install -g @anthropic-ai/agent-sdk
+          npm install -g @anthropic-ai/claude-agent-sdk
           npm install -g axios  # For callback posting
 
       - name: Validate inputs

@@ -587,3 +587,114 @@ class TestFeatureCreationWithWebhook:
         feature2 = result2.scalar_one()
 
         assert feature1.webhook_secret != feature2.webhook_secret
+
+
+# =============================================================================
+# Trigger Analysis with Callback URL Tests
+# =============================================================================
+
+
+class TestTriggerAnalysisWithCallback:
+    """Tests for trigger_analysis with callback URL."""
+
+    @pytest.mark.asyncio
+    async def test_trigger_analysis_includes_callback_url_when_webhook_base_url_set(
+        self, db_session: AsyncSession, monkeypatch
+    ):
+        """Trigger analysis should include callback URL when webhook_base_url is configured."""
+        # Create feature with UUID
+        feature_id = str(uuid4())
+        feature = Feature(
+            id=feature_id,
+            name="Test Feature",
+            description="Test description",
+            status=FeatureStatus.PENDING,
+            webhook_secret="test-secret",
+        )
+        db_session.add(feature)
+        await db_session.commit()
+
+        # Mock settings to have webhook_base_url
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "webhook_base_url", "https://api.example.com")
+
+        # Mock GitHubService
+        from app.api.features import get_github_service
+
+        mock_github_service = AsyncMock()
+        mock_github_service.trigger_analysis_workflow.return_value = 12345
+
+        # Override the GitHub service dependency
+        app.dependency_overrides[get_github_service] = lambda: mock_github_service
+
+        try:
+            async with AsyncClient(app=app, base_url="http://test") as client:
+                response = await client.post(
+                    f"/api/v1/features/{feature_id}/analyze"
+                )
+
+            assert response.status_code == 202
+
+            # Verify callback URL was passed to GitHub service
+            mock_github_service.trigger_analysis_workflow.assert_called_once()
+            call_args = mock_github_service.trigger_analysis_workflow.call_args
+
+            callback_url = call_args.kwargs.get("callback_url")
+            assert callback_url is not None
+            assert "https://api.example.com" in callback_url
+            assert "/api/v1/webhooks/analysis-result" in callback_url
+        finally:
+            # Clean up dependency override
+            if get_github_service in app.dependency_overrides:
+                del app.dependency_overrides[get_github_service]
+
+    @pytest.mark.asyncio
+    async def test_trigger_analysis_skips_callback_url_when_webhook_base_url_not_set(
+        self, db_session: AsyncSession, monkeypatch
+    ):
+        """Trigger analysis should not include callback URL when webhook_base_url is None."""
+        # Create feature with UUID
+        feature_id = str(uuid4())
+        feature = Feature(
+            id=feature_id,
+            name="Test Feature",
+            description="Test description",
+            status=FeatureStatus.PENDING,
+            webhook_secret="test-secret",
+        )
+        db_session.add(feature)
+        await db_session.commit()
+
+        # Mock settings to have no webhook_base_url
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "webhook_base_url", None)
+
+        # Mock GitHubService
+        from app.api.features import get_github_service
+
+        mock_github_service = AsyncMock()
+        mock_github_service.trigger_analysis_workflow.return_value = 12345
+
+        # Override the GitHub service dependency
+        app.dependency_overrides[get_github_service] = lambda: mock_github_service
+
+        try:
+            async with AsyncClient(app=app, base_url="http://test") as client:
+                response = await client.post(
+                    f"/api/v1/features/{feature_id}/analyze"
+                )
+
+            assert response.status_code == 202
+
+            # Verify callback URL was None
+            mock_github_service.trigger_analysis_workflow.assert_called_once()
+            call_args = mock_github_service.trigger_analysis_workflow.call_args
+
+            callback_url = call_args.kwargs.get("callback_url")
+            assert callback_url is None
+        finally:
+            # Clean up dependency override
+            if get_github_service in app.dependency_overrides:
+                del app.dependency_overrides[get_github_service]

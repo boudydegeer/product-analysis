@@ -207,10 +207,12 @@ async def trigger_analysis(
         )
 
     try:
-        # Construct callback URL (optional - can be None)
-        callback_url = None  # TODO: Set this if you want to receive results via callback
+        # Construct callback URL if webhook_base_url is configured
+        callback_url = None
+        if settings.webhook_base_url:
+            callback_url = f"{settings.webhook_base_url}/api/v1/webhooks/analysis-result"
 
-        # Trigger the analysis workflow with required parameters
+        # Trigger the analysis workflow with callback URL
         run_id = await github_service.trigger_analysis_workflow(
             feature_id=feature_id,
             feature_description=feature.description,
@@ -228,6 +230,7 @@ async def trigger_analysis(
             "run_id": run_id,
             "feature_id": str(feature_id),
             "status": "analyzing",
+            "callback_url": callback_url,  # Include in response for debugging
         }
 
     except Exception as e:

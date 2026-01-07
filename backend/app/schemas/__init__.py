@@ -7,6 +7,7 @@ from app.schemas.feature import (
     FeatureResponse,
 )
 from app.schemas.analysis import AnalysisResponse
+from app.schemas.webhook import AnalysisResultWebhook
 
 __all__ = [
     "FeatureBase",
@@ -14,4 +15,5 @@ __all__ = [
     "FeatureUpdate",
     "FeatureResponse",
     "AnalysisResponse",
+    "AnalysisResultWebhook",
 ]

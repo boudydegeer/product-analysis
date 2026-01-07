@@ -345,6 +345,48 @@ class TestDownloadWorkflowArtifact:
 
             assert result == expected_data
 
+    @pytest.mark.asyncio
+    async def test_download_workflow_artifact_follows_redirects(self, github_service):
+        """Should follow 302 redirects when downloading artifacts from Azure Blob Storage."""
+        run_id = 12345
+        expected_data = {"analysis": "complete"}
+
+        # Mock listing artifacts
+        mock_artifacts_response = MagicMock()
+        mock_artifacts_response.status_code = 200
+        mock_artifacts_response.json.return_value = {
+            "artifacts": [
+                {
+                    "id": 5050220102,
+                    "name": "analysis-result",
+                    "archive_download_url": "https://api.github.com/repos/owner/repo/actions/artifacts/5050220102/zip",
+                }
+            ]
+        }
+        mock_artifacts_response.raise_for_status = MagicMock()
+
+        # Mock downloading artifact - should follow 302 redirect to Azure Blob Storage
+        mock_download_response = MagicMock()
+        mock_download_response.status_code = 200
+        mock_download_response.content = _create_mock_zip_with_json(expected_data)
+        mock_download_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            github_service, "_client", new_callable=AsyncMock
+        ) as mock_client:
+            mock_client.get.side_effect = [
+                mock_artifacts_response,
+                mock_download_response,
+            ]
+
+            result = await github_service.download_workflow_artifact(run_id)
+
+            assert result == expected_data
+
+            # Verify that the download was called with follow_redirects=True
+            artifact_download_call = mock_client.get.call_args_list[1]
+            assert artifact_download_call.kwargs.get("follow_redirects") is True
+
 
 def _create_mock_zip_with_json(data: dict) -> bytes:
     """Create a mock ZIP file containing JSON data.

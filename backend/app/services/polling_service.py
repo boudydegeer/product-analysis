@@ -43,6 +43,8 @@ class AnalysisPollingService:
         Returns:
             List of features needing polling
         """
+        logger.debug("Querying database for features needing polling")
+
         cutoff_time = datetime.now(UTC) - timedelta(seconds=self.timeout_seconds)
         webhook_grace_period = datetime.now(UTC) - timedelta(minutes=5)
 
@@ -61,6 +63,7 @@ class AnalysisPollingService:
         result = await self.db.execute(query)
         features = result.scalars().all()
 
+        logger.debug(f"Found {len(features)} features needing polling")
         return list(features)
 
     async def poll_workflow_status(self, feature: Feature) -> None:
@@ -70,8 +73,11 @@ class AnalysisPollingService:
             feature: Feature to poll
         """
         if not feature.analysis_workflow_run_id:
-            logger.warning(f"Feature {feature.id} has no workflow_run_id")
+            logger.warning(f"Feature {feature.id} has no workflow_run_id, skipping")
             return
+
+        run_id = int(feature.analysis_workflow_run_id)
+        logger.info(f"Polling feature {feature.id}: checking workflow {run_id}")
 
         try:
             github_service = GitHubService(
@@ -83,19 +89,18 @@ class AnalysisPollingService:
             feature.last_polled_at = datetime.now(UTC)
 
             # Check workflow status
-            run_id = int(feature.analysis_workflow_run_id)
             status = await github_service.get_workflow_run_status(run_id)
 
-            logger.info(
-                f"Workflow {run_id} for feature {feature.id} status: {status}"
-            )
+            logger.info(f"Polling feature {feature.id}: workflow status is {status}")
 
             if status == "completed":
                 # Download and process results
+                logger.info(f"Polling feature {feature.id}: downloading results and updating status")
                 await self._process_completed_workflow(feature, run_id, github_service)
 
             elif status in ["failure", "cancelled", "timed_out"]:
                 # Mark feature as failed
+                logger.warning(f"Polling feature {feature.id}: workflow {status}, marking as FAILED")
                 feature.status = FeatureStatus.FAILED
 
                 # Create error analysis record
@@ -111,17 +116,19 @@ class AnalysisPollingService:
                 )
                 self.db.add(analysis)
 
-            # If status is "queued" or "in_progress", do nothing (keep polling)
+            elif status in ["queued", "in_progress"]:
+                # Still running, will check again next polling cycle
+                logger.debug(f"Polling feature {feature.id}: workflow still {status}, will check again later")
 
             await self.db.commit()
             await github_service.close()
 
         except GitHubServiceError as e:
-            logger.error(f"GitHub API error polling feature {feature.id}: {e}")
+            logger.error(f"Polling feature {feature.id}: GitHub API error - {e}")
             # Don't update feature status on transient errors
 
         except Exception as e:
-            logger.error(f"Unexpected error polling feature {feature.id}: {e}")
+            logger.error(f"Polling feature {feature.id}: unexpected error - {e}", exc_info=True)
 
     async def _process_completed_workflow(
         self, feature: Feature, run_id: int, github_service: GitHubService
@@ -136,15 +143,24 @@ class AnalysisPollingService:
         try:
             # Download artifact with feature-specific name
             artifact_name = f"feature-analysis-{feature.id}"
+            logger.debug(f"Polling feature {feature.id}: downloading artifact '{artifact_name}'")
+
             result_data = await github_service.download_workflow_artifact(
                 run_id, artifact_name=artifact_name
             )
+
+            logger.debug(f"Polling feature {feature.id}: artifact downloaded successfully")
 
             # Check if analysis had errors
             has_error = "error" in result_data
 
             # Update feature status
-            feature.status = FeatureStatus.FAILED if has_error else FeatureStatus.COMPLETED
+            new_status = FeatureStatus.FAILED if has_error else FeatureStatus.COMPLETED
+            feature.status = new_status
+
+            logger.info(
+                f"Polling feature {feature.id}: updated status to {new_status.value}"
+            )
 
             # Create analysis record
             analysis = Analysis(
@@ -160,12 +176,12 @@ class AnalysisPollingService:
             self.db.add(analysis)
 
             logger.info(
-                f"Successfully processed completed workflow for feature {feature.id}"
+                f"Polling feature {feature.id}: successfully processed completed workflow"
             )
 
         except GitHubServiceError as e:
             logger.error(
-                f"Failed to download artifact for feature {feature.id}: {e}"
+                f"Polling feature {feature.id}: failed to download artifact - {e}"
             )
             feature.status = FeatureStatus.FAILED
 
@@ -188,15 +204,20 @@ class AnalysisPollingService:
         Returns:
             Number of features polled
         """
+        logger.info("Polling service: Starting to check for features needing updates")
+
         features = await self.get_features_needing_polling()
 
-        logger.info(f"Polling {len(features)} features")
+        if len(features) == 0:
+            logger.info("Polling service: No features needing updates")
+        else:
+            logger.info(f"Polling service: Found {len(features)} features needing updates")
 
         for feature in features:
             try:
                 await self.poll_workflow_status(feature)
             except Exception as e:
-                logger.error(f"Error polling feature {feature.id}: {e}")
+                logger.error(f"Polling service: Error polling feature {feature.id} - {e}", exc_info=True)
                 # Continue with other features
 
         return len(features)

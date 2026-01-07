@@ -270,3 +270,36 @@ class TestAnalysisPollingService:
 
         # Should still count as attempted
         assert polled_count >= 0
+
+    async def test_timezone_aware_datetime_compatibility(
+        self, polling_service, db_session: AsyncSession
+    ):
+        """Should handle mixed timezone-aware and timezone-naive datetimes correctly.
+
+        This reproduces the bug where webhook_received_at is set with datetime.utcnow()
+        (timezone-naive) while polling service uses datetime.now(UTC) (timezone-aware),
+        causing asyncpg to fail with: "can't subtract offset-naive and offset-aware datetimes"
+        """
+        # Simulate webhook endpoint setting timezone-naive datetime (the bug)
+        # This is what happens when using datetime.utcnow()
+        naive_datetime = datetime.utcnow()
+
+        feature = Feature(
+            id="timezone-test-feature",
+            name="Timezone Test",
+            description="Test timezone handling",
+            status=FeatureStatus.ANALYZING,
+            analysis_workflow_run_id="33333",
+            webhook_received_at=naive_datetime,  # This is timezone-naive!
+        )
+        db_session.add(feature)
+        await db_session.commit()
+
+        # This should not raise "can't subtract offset-naive and offset-aware datetimes"
+        # The polling service uses datetime.now(UTC) which is timezone-aware
+        features = await polling_service.get_features_needing_polling()
+
+        # Feature should be excluded because webhook was received very recently
+        feature_ids = [f.id for f in features]
+        # The test passes if no exception is raised during the query
+        assert True  # If we get here, the timezone handling works

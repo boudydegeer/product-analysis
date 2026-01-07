@@ -1,7 +1,7 @@
 """Tests for Pydantic schemas."""
 
 import pytest
-from datetime import datetime
+from datetime import datetime, UTC
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
@@ -185,7 +185,7 @@ class TestFeatureResponse:
         from app.models.feature import FeatureStatus
 
         test_uuid = uuid4()
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         response = FeatureResponse(
             id=test_uuid,
             name="Test Feature",
@@ -202,7 +202,7 @@ class TestFeatureResponse:
         from app.models.feature import FeatureStatus
 
         test_uuid = uuid4()
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         response = FeatureResponse(
             id=test_uuid,
             name="Test Feature",
@@ -219,7 +219,7 @@ class TestFeatureResponse:
         from app.models.feature import FeatureStatus
 
         test_uuid = uuid4()
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         response = FeatureResponse(
             id=test_uuid,
             name="Test Feature",
@@ -236,7 +236,7 @@ class TestFeatureResponse:
         from app.models.feature import FeatureStatus
 
         test_uuid = uuid4()
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         response = FeatureResponse(
             id=test_uuid,
             name="Test Feature",
@@ -253,7 +253,7 @@ class TestFeatureResponse:
         from app.models.feature import FeatureStatus
 
         test_uuid = uuid4()
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # Without github_issue_url
         response = FeatureResponse(
@@ -282,7 +282,7 @@ class TestFeatureResponse:
         from app.models.feature import FeatureStatus
 
         test_uuid = uuid4()
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # Without analysis_workflow_run_id
         response = FeatureResponse(
@@ -321,7 +321,7 @@ class TestAnalysisResponse:
         """AnalysisResponse should have id as int."""
         from app.schemas.analysis import AnalysisResponse
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         test_uuid = uuid4()
         response = AnalysisResponse(
             id=1,
@@ -338,7 +338,7 @@ class TestAnalysisResponse:
         """AnalysisResponse should have feature_id as UUID."""
         from app.schemas.analysis import AnalysisResponse
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         test_uuid = uuid4()
         response = AnalysisResponse(
             id=1,
@@ -355,7 +355,7 @@ class TestAnalysisResponse:
         """AnalysisResponse should have result as dict."""
         from app.schemas.analysis import AnalysisResponse
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         test_uuid = uuid4()
         result_data = {"complexity": "high", "estimate": 40}
         response = AnalysisResponse(
@@ -373,7 +373,7 @@ class TestAnalysisResponse:
         """AnalysisResponse should have tokens_used as int."""
         from app.schemas.analysis import AnalysisResponse
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         test_uuid = uuid4()
         response = AnalysisResponse(
             id=1,
@@ -390,7 +390,7 @@ class TestAnalysisResponse:
         """AnalysisResponse should have model_used as str."""
         from app.schemas.analysis import AnalysisResponse
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         test_uuid = uuid4()
         response = AnalysisResponse(
             id=1,
@@ -407,7 +407,7 @@ class TestAnalysisResponse:
         """AnalysisResponse should have completed_at as optional datetime."""
         from app.schemas.analysis import AnalysisResponse
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         test_uuid = uuid4()
 
         # Without completed_at
@@ -422,7 +422,7 @@ class TestAnalysisResponse:
         assert response.completed_at is None
 
         # With completed_at
-        completed = datetime.utcnow()
+        completed = datetime.now(UTC)
         response_completed = AnalysisResponse(
             id=1,
             feature_id=test_uuid,
@@ -439,7 +439,7 @@ class TestAnalysisResponse:
         """AnalysisResponse should have created_at as datetime."""
         from app.schemas.analysis import AnalysisResponse
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         test_uuid = uuid4()
         response = AnalysisResponse(
             id=1,

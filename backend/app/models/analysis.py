@@ -26,7 +26,7 @@ class Analysis(Base, TimestampMixin):
     result: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     tokens_used: Mapped[int] = mapped_column(Integer, nullable=False)
     model_used: Mapped[str] = mapped_column(String(100), nullable=False)
-    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     feature: Mapped["Feature"] = relationship("Feature", back_populates="analyses")

@@ -1,6 +1,6 @@
 """Webhook endpoints for receiving analysis results from GitHub workflows."""
 
-from datetime import datetime
+from datetime import datetime, UTC
 from fastapi import APIRouter, HTTPException, Header, Request, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -86,7 +86,7 @@ async def receive_analysis_result(
         feature.status = FeatureStatus.COMPLETED
 
     # Record when webhook was received
-    feature.webhook_received_at = datetime.utcnow()
+    feature.webhook_received_at = datetime.now(UTC)
 
     # Create Analysis record with the results
     # Store all webhook data as JSON in the result field
@@ -108,7 +108,7 @@ async def receive_analysis_result(
         result=result_data,
         tokens_used=0,  # Webhook doesn't provide token count
         model_used="github-workflow",  # Indicate this came from workflow
-        completed_at=datetime.utcnow(),
+        completed_at=datetime.now(UTC),
     )
 
     db.add(analysis)

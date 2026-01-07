@@ -9,7 +9,7 @@ These tests verify:
 """
 
 import pytest
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -341,7 +341,7 @@ class TestAnalysisModel:
         session.add(feature)
         session.commit()
 
-        completed = datetime.now()
+        completed = datetime.now(UTC)
         analysis = Analysis(
             feature_id="FEAT-006",
             result={"summary": "test"},
@@ -352,7 +352,8 @@ class TestAnalysisModel:
         session.add(analysis)
         session.commit()
 
-        assert analysis.completed_at == completed
+        # SQLite doesn't preserve timezone info, so compare without timezone
+        assert analysis.completed_at.replace(tzinfo=None) == completed.replace(tzinfo=None)
 
     def test_analysis_has_created_at_field(self, session):
         """Analysis should have a created_at timestamp field."""
@@ -531,7 +532,7 @@ class TestFeatureWebhookFields:
 
     def test_feature_has_webhook_received_at_field(self, session):
         """Feature should track when webhook was received."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         feature = Feature(
             id="test-123",
             name="Test Feature",
@@ -540,11 +541,14 @@ class TestFeatureWebhookFields:
         )
         session.add(feature)
         session.commit()
-        
+
         retrieved = session.get(Feature, "test-123")
         assert retrieved.webhook_received_at is not None
+        # SQLite doesn't preserve timezone info, so compare without timezone
         # Use timedelta comparison to avoid microsecond precision issues
-        assert abs((retrieved.webhook_received_at - now).total_seconds()) < 1
+        now_naive = now.replace(tzinfo=None)
+        retrieved_naive = retrieved.webhook_received_at.replace(tzinfo=None) if retrieved.webhook_received_at.tzinfo else retrieved.webhook_received_at
+        assert abs((retrieved_naive - now_naive).total_seconds()) < 1
 
     def test_webhook_received_at_is_optional(self, session):
         """Webhook received timestamp should be optional."""
@@ -561,7 +565,7 @@ class TestFeatureWebhookFields:
 
     def test_feature_has_last_polled_at_field(self, session):
         """Feature should track when it was last polled."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         feature = Feature(
             id="test-123",
             name="Test Feature",
@@ -570,10 +574,13 @@ class TestFeatureWebhookFields:
         )
         session.add(feature)
         session.commit()
-        
+
         retrieved = session.get(Feature, "test-123")
         assert retrieved.last_polled_at is not None
-        assert abs((retrieved.last_polled_at - now).total_seconds()) < 1
+        # SQLite doesn't preserve timezone info, so compare without timezone
+        now_naive = now.replace(tzinfo=None)
+        retrieved_naive = retrieved.last_polled_at.replace(tzinfo=None) if retrieved.last_polled_at.tzinfo else retrieved.last_polled_at
+        assert abs((retrieved_naive - now_naive).total_seconds()) < 1
 
     def test_last_polled_at_is_optional(self, session):
         """Last polled timestamp should be optional."""

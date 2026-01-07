@@ -21,17 +21,17 @@ async def poll_analyzing_features() -> None:
     This runs periodically to check workflow status and download results
     for features that haven't received webhook callbacks.
     """
-    logger.info("Starting polling task for analyzing features")
+    logger.info("Polling task: Started")
 
     try:
         async with async_session_maker() as db:
             polling_service = AnalysisPollingService(db)
             polled_count = await polling_service.poll_all_analyzing_features()
 
-            logger.info(f"Polling task completed, polled {polled_count} features")
+            logger.info(f"Polling task: Completed, processed {polled_count} features")
 
     except Exception as e:
-        logger.error(f"Polling task failed: {e}", exc_info=True)
+        logger.error(f"Polling task: Failed with error - {e}", exc_info=True)
 
 
 def start_polling_scheduler() -> AsyncIOScheduler:

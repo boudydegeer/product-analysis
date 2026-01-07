@@ -247,7 +247,7 @@ class GitHubService:
             artifact_id = target_artifact["id"]
             download_url = f"/repos/{self.owner}/{self.repo_name}/actions/artifacts/{artifact_id}/zip"
 
-            download_response = await self._client.get(download_url)
+            download_response = await self._client.get(download_url, follow_redirects=True)
             download_response.raise_for_status()
 
             # Parse ZIP and extract JSON

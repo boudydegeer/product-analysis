@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     # Security
     secret_key: str = "change-this-in-production"
 
+    # Webhooks
+    webhook_secret: str = "change-this-webhook-secret-in-production"
+    webhook_base_url: str | None = None  # Set for production, leave None for localhost
+
+    # Analysis Polling
+    analysis_polling_interval_seconds: int = 30  # Check every 30 seconds
+    analysis_polling_timeout_seconds: int = 900  # Give up after 15 minutes
+
     # CORS
     cors_origins: list[str] = [
         "http://localhost:5173",  # Vite dev server (default)

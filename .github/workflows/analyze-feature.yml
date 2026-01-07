@@ -150,17 +150,13 @@ jobs:
           }
           `;
 
-          // Create a temporary file with the prompt
-          const promptFile = '/tmp/analysis-prompt.txt';
-          fs.writeFileSync(promptFile, analysisPrompt);
-
-          console.log('Starting Claude Agent SDK analysis...');
+          console.log('Starting Claude Code analysis...');
           console.log('Feature ID:', featureId);
           console.log('Timestamp:', timestamp);
           console.log('---');
 
-          // Execute Claude Agent SDK
-          const claude = spawn('claude', ['--prompt', promptFile], {
+          // Execute Claude Code CLI in programmatic mode with -p flag
+          const claude = spawn('claude', ['-p', analysisPrompt], {
             env: {
               ...process.env,
               ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY
@@ -184,7 +180,7 @@ jobs:
 
           claude.on('close', async (code) => {
             console.log('\n---');
-            console.log('Claude Agent SDK completed with code:', code);
+            console.log('Claude Code completed with code:', code);
 
             if (code !== 0) {
               console.error('Analysis failed:', errorOutput);

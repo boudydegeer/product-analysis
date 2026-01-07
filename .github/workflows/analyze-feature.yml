@@ -203,7 +203,7 @@ jobs:
                 permissionMode: 'bypassPermissions',
                 allowDangerouslySkipPermissions: true,
                 allowedTools: ['Read', 'Glob', 'Grep', 'Bash'],
-                maxTurns: 10,
+                maxTurns: 30,  // Increased from 10 to allow repo exploration + analysis
                 maxBudgetUsd: 2.00,
                 apiKey: process.env.ANTHROPIC_API_KEY
               };

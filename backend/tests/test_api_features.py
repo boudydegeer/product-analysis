@@ -84,19 +84,19 @@ async def db_session():
 
 
 # =============================================================================
-# POST /api/features - Create Feature Tests
+# POST /api/v1/features - Create Feature Tests
 # =============================================================================
 
 
 class TestCreateFeature:
-    """Tests for POST /api/features endpoint."""
+    """Tests for POST /api/v1/features endpoint."""
 
     @pytest.mark.asyncio
     async def test_create_feature_valid_data(
         self, async_client: AsyncClient, sample_feature_data: dict
     ):
         """Test creating a feature with valid data returns 201 and the created feature."""
-        response = await async_client.post("/api/features", json=sample_feature_data)
+        response = await async_client.post("/api/v1/features", json=sample_feature_data)
 
         assert response.status_code == 201
         data = response.json()
@@ -115,7 +115,7 @@ class TestCreateFeature:
             "description": "Some description",
             "priority": 1,
         }
-        response = await async_client.post("/api/features", json=data)
+        response = await async_client.post("/api/v1/features", json=data)
 
         assert response.status_code == 422
 
@@ -127,7 +127,7 @@ class TestCreateFeature:
             "description": "Some description",
             "priority": 1,
         }
-        response = await async_client.post("/api/features", json=data)
+        response = await async_client.post("/api/v1/features", json=data)
 
         # Empty string is allowed by default Pydantic, so this should pass
         # If we want to reject empty names, we need to add validation
@@ -137,7 +137,7 @@ class TestCreateFeature:
     async def test_create_feature_default_values(self, async_client: AsyncClient):
         """Test creating a feature with minimal data uses default values."""
         data = {"name": "Minimal Feature"}
-        response = await async_client.post("/api/features", json=data)
+        response = await async_client.post("/api/v1/features", json=data)
 
         assert response.status_code == 201
         result = response.json()
@@ -146,17 +146,17 @@ class TestCreateFeature:
 
 
 # =============================================================================
-# GET /api/features - List Features Tests
+# GET /api/v1/features - List Features Tests
 # =============================================================================
 
 
 class TestListFeatures:
-    """Tests for GET /api/features endpoint."""
+    """Tests for GET /api/v1/features endpoint."""
 
     @pytest.mark.asyncio
     async def test_list_features_empty(self, async_client: AsyncClient):
         """Test listing features returns empty list when no features exist."""
-        response = await async_client.get("/api/features")
+        response = await async_client.get("/api/v1/features")
 
         assert response.status_code == 200
         assert response.json() == []
@@ -167,9 +167,9 @@ class TestListFeatures:
     ):
         """Test listing features returns all created features."""
         # Create multiple features
-        await async_client.post("/api/features", json=sample_feature_data)
+        await async_client.post("/api/v1/features", json=sample_feature_data)
         await async_client.post(
-            "/api/features",
+            "/api/v1/features",
             json={
                 "name": "Second Feature",
                 "description": "Another feature",
@@ -177,7 +177,7 @@ class TestListFeatures:
             },
         )
 
-        response = await async_client.get("/api/features")
+        response = await async_client.get("/api/v1/features")
 
         assert response.status_code == 200
         data = response.json()
@@ -191,11 +191,11 @@ class TestListFeatures:
         # Create multiple features
         for i in range(5):
             await async_client.post(
-                "/api/features",
+                "/api/v1/features",
                 json={"name": f"Feature {i}", "description": f"Description {i}"},
             )
 
-        response = await async_client.get("/api/features?skip=2")
+        response = await async_client.get("/api/v1/features?skip=2")
 
         assert response.status_code == 200
         data = response.json()
@@ -209,11 +209,11 @@ class TestListFeatures:
         # Create multiple features
         for i in range(5):
             await async_client.post(
-                "/api/features",
+                "/api/v1/features",
                 json={"name": f"Feature {i}", "description": f"Description {i}"},
             )
 
-        response = await async_client.get("/api/features?limit=2")
+        response = await async_client.get("/api/v1/features?limit=2")
 
         assert response.status_code == 200
         data = response.json()
@@ -221,12 +221,12 @@ class TestListFeatures:
 
 
 # =============================================================================
-# GET /api/features/{id} - Get Single Feature Tests
+# GET /api/v1/features/{id} - Get Single Feature Tests
 # =============================================================================
 
 
 class TestGetFeature:
-    """Tests for GET /api/features/{id} endpoint."""
+    """Tests for GET /api/v1/features/{id} endpoint."""
 
     @pytest.mark.asyncio
     async def test_get_feature_found(
@@ -235,11 +235,11 @@ class TestGetFeature:
         """Test getting a feature by ID returns the feature."""
         # Create a feature first
         create_response = await async_client.post(
-            "/api/features", json=sample_feature_data
+            "/api/v1/features", json=sample_feature_data
         )
         feature_id = create_response.json()["id"]
 
-        response = await async_client.get(f"/api/features/{feature_id}")
+        response = await async_client.get(f"/api/v1/features/{feature_id}")
 
         assert response.status_code == 200
         data = response.json()
@@ -250,7 +250,7 @@ class TestGetFeature:
     async def test_get_feature_not_found(self, async_client: AsyncClient):
         """Test getting a non-existent feature returns 404."""
         non_existent_id = str(uuid4())
-        response = await async_client.get(f"/api/features/{non_existent_id}")
+        response = await async_client.get(f"/api/v1/features/{non_existent_id}")
 
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
@@ -258,18 +258,18 @@ class TestGetFeature:
     @pytest.mark.asyncio
     async def test_get_feature_invalid_id_format(self, async_client: AsyncClient):
         """Test getting a feature with invalid UUID format returns 422."""
-        response = await async_client.get("/api/features/invalid-uuid")
+        response = await async_client.get("/api/v1/features/invalid-uuid")
 
         assert response.status_code == 422
 
 
 # =============================================================================
-# PUT /api/features/{id} - Update Feature Tests
+# PUT /api/v1/features/{id} - Update Feature Tests
 # =============================================================================
 
 
 class TestUpdateFeature:
-    """Tests for PUT /api/features/{id} endpoint."""
+    """Tests for PUT /api/v1/features/{id} endpoint."""
 
     @pytest.mark.asyncio
     async def test_update_feature_partial(
@@ -278,14 +278,14 @@ class TestUpdateFeature:
         """Test partial update of a feature."""
         # Create a feature first
         create_response = await async_client.post(
-            "/api/features", json=sample_feature_data
+            "/api/v1/features", json=sample_feature_data
         )
         feature_id = create_response.json()["id"]
 
         # Update only the name
         update_data = {"name": "Updated Name"}
         response = await async_client.put(
-            f"/api/features/{feature_id}", json=update_data
+            f"/api/v1/features/{feature_id}", json=update_data
         )
 
         assert response.status_code == 200
@@ -302,14 +302,14 @@ class TestUpdateFeature:
         """Test updating feature status."""
         # Create a feature first
         create_response = await async_client.post(
-            "/api/features", json=sample_feature_data
+            "/api/v1/features", json=sample_feature_data
         )
         feature_id = create_response.json()["id"]
 
         # Update status
         update_data = {"status": "analyzing"}
         response = await async_client.put(
-            f"/api/features/{feature_id}", json=update_data
+            f"/api/v1/features/{feature_id}", json=update_data
         )
 
         assert response.status_code == 200
@@ -321,7 +321,7 @@ class TestUpdateFeature:
         non_existent_id = str(uuid4())
         update_data = {"name": "Updated Name"}
         response = await async_client.put(
-            f"/api/features/{non_existent_id}", json=update_data
+            f"/api/v1/features/{non_existent_id}", json=update_data
         )
 
         assert response.status_code == 404
@@ -333,26 +333,26 @@ class TestUpdateFeature:
         """Test updating feature with invalid status returns 422."""
         # Create a feature first
         create_response = await async_client.post(
-            "/api/features", json=sample_feature_data
+            "/api/v1/features", json=sample_feature_data
         )
         feature_id = create_response.json()["id"]
 
         # Try to update with invalid status
         update_data = {"status": "invalid_status"}
         response = await async_client.put(
-            f"/api/features/{feature_id}", json=update_data
+            f"/api/v1/features/{feature_id}", json=update_data
         )
 
         assert response.status_code == 422
 
 
 # =============================================================================
-# DELETE /api/features/{id} - Delete Feature Tests
+# DELETE /api/v1/features/{id} - Delete Feature Tests
 # =============================================================================
 
 
 class TestDeleteFeature:
-    """Tests for DELETE /api/features/{id} endpoint."""
+    """Tests for DELETE /api/v1/features/{id} endpoint."""
 
     @pytest.mark.asyncio
     async def test_delete_feature_success(
@@ -361,34 +361,34 @@ class TestDeleteFeature:
         """Test deleting a feature returns 204 and removes the feature."""
         # Create a feature first
         create_response = await async_client.post(
-            "/api/features", json=sample_feature_data
+            "/api/v1/features", json=sample_feature_data
         )
         feature_id = create_response.json()["id"]
 
         # Delete the feature
-        response = await async_client.delete(f"/api/features/{feature_id}")
+        response = await async_client.delete(f"/api/v1/features/{feature_id}")
         assert response.status_code == 204
 
         # Verify it's gone
-        get_response = await async_client.get(f"/api/features/{feature_id}")
+        get_response = await async_client.get(f"/api/v1/features/{feature_id}")
         assert get_response.status_code == 404
 
     @pytest.mark.asyncio
     async def test_delete_feature_not_found(self, async_client: AsyncClient):
         """Test deleting a non-existent feature returns 404."""
         non_existent_id = str(uuid4())
-        response = await async_client.delete(f"/api/features/{non_existent_id}")
+        response = await async_client.delete(f"/api/v1/features/{non_existent_id}")
 
         assert response.status_code == 404
 
 
 # =============================================================================
-# POST /api/features/{id}/analyze - Trigger Analysis Tests
+# POST /api/v1/features/{id}/analyze - Trigger Analysis Tests
 # =============================================================================
 
 
 class TestTriggerAnalysis:
-    """Tests for POST /api/features/{id}/analyze endpoint."""
+    """Tests for POST /api/v1/features/{id}/analyze endpoint."""
 
     @pytest.fixture
     def mock_github_service(self):
@@ -406,7 +406,7 @@ class TestTriggerAnalysis:
 
         # Create a feature first
         create_response = await async_client.post(
-            "/api/features", json=sample_feature_data
+            "/api/v1/features", json=sample_feature_data
         )
         feature_id = create_response.json()["id"]
 
@@ -414,7 +414,7 @@ class TestTriggerAnalysis:
         app.dependency_overrides[get_github_service] = lambda: mock_github_service
 
         try:
-            response = await async_client.post(f"/api/features/{feature_id}/analyze")
+            response = await async_client.post(f"/api/v1/features/{feature_id}/analyze")
 
             assert response.status_code == 202
             data = response.json()
@@ -422,7 +422,7 @@ class TestTriggerAnalysis:
             assert data["run_id"] == 12345678
 
             # Verify feature status was updated
-            get_response = await async_client.get(f"/api/features/{feature_id}")
+            get_response = await async_client.get(f"/api/v1/features/{feature_id}")
             assert get_response.json()["status"] == "analyzing"
         finally:
             # Clean up dependency override
@@ -441,7 +441,7 @@ class TestTriggerAnalysis:
 
         try:
             non_existent_id = str(uuid4())
-            response = await async_client.post(f"/api/features/{non_existent_id}/analyze")
+            response = await async_client.post(f"/api/v1/features/{non_existent_id}/analyze")
 
             assert response.status_code == 404
         finally:
@@ -458,7 +458,7 @@ class TestTriggerAnalysis:
 
         # Create a feature first
         create_response = await async_client.post(
-            "/api/features", json=sample_feature_data
+            "/api/v1/features", json=sample_feature_data
         )
         feature_id = create_response.json()["id"]
 
@@ -472,10 +472,10 @@ class TestTriggerAnalysis:
         app.dependency_overrides[get_github_service] = lambda: mock_service
 
         try:
-            await async_client.post(f"/api/features/{feature_id}/analyze")
+            await async_client.post(f"/api/v1/features/{feature_id}/analyze")
 
             # Verify workflow run_id was stored
-            get_response = await async_client.get(f"/api/features/{feature_id}")
+            get_response = await async_client.get(f"/api/v1/features/{feature_id}")
             assert get_response.json()["analysis_workflow_run_id"] == str(expected_run_id)
         finally:
             # Clean up dependency override
@@ -491,7 +491,7 @@ class TestTriggerAnalysis:
 
         # Create a feature first
         create_response = await async_client.post(
-            "/api/features", json=sample_feature_data
+            "/api/v1/features", json=sample_feature_data
         )
         feature_id = create_response.json()["id"]
 
@@ -505,7 +505,7 @@ class TestTriggerAnalysis:
         app.dependency_overrides[get_github_service] = lambda: mock_service
 
         try:
-            response = await async_client.post(f"/api/features/{feature_id}/analyze")
+            response = await async_client.post(f"/api/v1/features/{feature_id}/analyze")
 
             assert response.status_code == 500
             assert "error" in response.json()["detail"].lower()

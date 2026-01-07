@@ -16,7 +16,7 @@ from app.models import Feature, FeatureStatus
 from app.schemas import FeatureCreate, FeatureUpdate, FeatureResponse
 from app.services.github_service import GitHubService
 
-router = APIRouter(prefix="/api/features", tags=["features"])
+router = APIRouter(prefix="/api/v1/features", tags=["features"])
 
 
 def get_github_service() -> GitHubService:

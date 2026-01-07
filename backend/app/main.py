@@ -22,6 +22,17 @@ app.add_middleware(
 app.include_router(features_router)
 
 
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {
+        "app": settings.app_name,
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""

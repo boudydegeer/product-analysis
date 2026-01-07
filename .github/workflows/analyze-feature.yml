@@ -173,7 +173,7 @@ jobs:
               console.log('Executing query with SDK...\n');
 
               let fullOutput = '';
-              let jsonOutput = null;
+              let resultContent = null;
 
               // Iterate through the async generator
               for await (const message of query({ prompt: analysisPrompt, options })) {
@@ -188,9 +188,13 @@ jobs:
                 } else if (message.type === 'result') {
                   console.log('\n[RESULT]', JSON.stringify(message, null, 2));
 
-                  // Try to extract structured output
-                  if (message.content) {
-                    fullOutput += message.content;
+                  // Extract the result field which contains the full analysis
+                  if (message.result) {
+                    resultContent = message.result;
+                    console.log('\nExtracted result content from message.result');
+                  } else if (message.content) {
+                    resultContent = message.content;
+                    console.log('\nExtracted result content from message.content (fallback)');
                   }
                 } else {
                   // Handle other message types
@@ -201,11 +205,13 @@ jobs:
               console.log('\n\n---');
               console.log('Claude Agent SDK analysis complete');
 
-              // Try to extract JSON from the output
+              // Try to extract JSON from the result
               let analysisResult;
+              const contentToAnalyze = resultContent || fullOutput;
+
               try {
-                // Look for JSON in the output (Claude might add markdown formatting)
-                const jsonMatch = fullOutput.match(/\{[\s\S]*\}/);
+                // Look for JSON in the result content (Claude might add markdown formatting)
+                const jsonMatch = contentToAnalyze.match(/\{[\s\S]*\}/);
                 if (jsonMatch) {
                   analysisResult = JSON.parse(jsonMatch[0]);
                   console.log('Successfully parsed structured JSON output');
@@ -214,7 +220,7 @@ jobs:
                   console.warn('Could not find JSON in output, wrapping raw output');
                   analysisResult = {
                     feature_id: featureId,
-                    raw_output: fullOutput,
+                    raw_output: contentToAnalyze,
                     error: "Could not parse structured JSON from Claude response"
                   };
                 }
@@ -222,7 +228,7 @@ jobs:
                 console.error('Failed to parse JSON:', parseError.message);
                 analysisResult = {
                   feature_id: featureId,
-                  raw_output: fullOutput,
+                  raw_output: contentToAnalyze,
                   error: parseError.message
                 };
               }

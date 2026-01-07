@@ -1,9 +1,10 @@
 """Feature model for tracking feature requests."""
 
 from typing import Optional, TYPE_CHECKING
+from datetime import datetime
 import enum
 
-from sqlalchemy import String, Text, Integer, Enum as SQLEnum
+from sqlalchemy import String, Text, Integer, Enum as SQLEnum, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -39,6 +40,13 @@ class Feature(Base, TimestampMixin):
     analysis_workflow_run_id: Mapped[Optional[str]] = mapped_column(
         String(50), nullable=True
     )
+
+    # Webhook tracking
+    webhook_secret: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    webhook_received_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Polling tracking
+    last_polled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Relationships
     analyses: Mapped[list["Analysis"]] = relationship(

@@ -497,3 +497,93 @@ class TestFeatureAnalysisRelationship:
         # Verify analysis was also deleted
         deleted_analysis = session.get(Analysis, analysis_id)
         assert deleted_analysis is None
+
+
+class TestFeatureWebhookFields:
+    """Tests for webhook-related fields in Feature model."""
+
+    def test_feature_has_webhook_secret_field(self, session):
+        """Feature should have webhook_secret field for validation."""
+        feature = Feature(
+            id="test-123",
+            name="Test Feature",
+            description="Test",
+            webhook_secret="secret-abc-123",
+        )
+        session.add(feature)
+        session.commit()
+        
+        retrieved = session.get(Feature, "test-123")
+        assert retrieved.webhook_secret == "secret-abc-123"
+
+    def test_webhook_secret_is_optional(self, session):
+        """Webhook secret should be optional (can be None)."""
+        feature = Feature(
+            id="test-123",
+            name="Test Feature",
+            description="Test",
+        )
+        session.add(feature)
+        session.commit()
+        
+        retrieved = session.get(Feature, "test-123")
+        assert retrieved.webhook_secret is None
+
+    def test_feature_has_webhook_received_at_field(self, session):
+        """Feature should track when webhook was received."""
+        now = datetime.utcnow()
+        feature = Feature(
+            id="test-123",
+            name="Test Feature",
+            description="Test",
+            webhook_received_at=now,
+        )
+        session.add(feature)
+        session.commit()
+        
+        retrieved = session.get(Feature, "test-123")
+        assert retrieved.webhook_received_at is not None
+        # Use timedelta comparison to avoid microsecond precision issues
+        assert abs((retrieved.webhook_received_at - now).total_seconds()) < 1
+
+    def test_webhook_received_at_is_optional(self, session):
+        """Webhook received timestamp should be optional."""
+        feature = Feature(
+            id="test-123",
+            name="Test Feature",
+            description="Test",
+        )
+        session.add(feature)
+        session.commit()
+        
+        retrieved = session.get(Feature, "test-123")
+        assert retrieved.webhook_received_at is None
+
+    def test_feature_has_last_polled_at_field(self, session):
+        """Feature should track when it was last polled."""
+        now = datetime.utcnow()
+        feature = Feature(
+            id="test-123",
+            name="Test Feature",
+            description="Test",
+            last_polled_at=now,
+        )
+        session.add(feature)
+        session.commit()
+        
+        retrieved = session.get(Feature, "test-123")
+        assert retrieved.last_polled_at is not None
+        assert abs((retrieved.last_polled_at - now).total_seconds()) < 1
+
+    def test_last_polled_at_is_optional(self, session):
+        """Last polled timestamp should be optional."""
+        feature = Feature(
+            id="test-123",
+            name="Test Feature",
+            description="Test",
+        )
+        session.add(feature)
+        session.commit()
+        
+        retrieved = session.get(Feature, "test-123")
+        assert retrieved.last_polled_at is None

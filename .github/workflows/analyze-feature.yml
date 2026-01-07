@@ -32,14 +32,6 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Claude Code CLI
-        run: npm install -g @anthropic-ai/claude-code
-
-      - name: Install Claude Agent SDK
-        run: |
-          npm install -g @anthropic-ai/claude-agent-sdk
-          npm install -g axios  # For callback posting
-
       - name: Validate inputs
         id: validate
         run: |
@@ -50,10 +42,21 @@ jobs:
 
       - name: Create analysis script
         run: |
+          # Create package.json for ES6 module support
+          cat > package.json << 'PACKAGE_JSON'
+          {
+            "type": "module",
+            "dependencies": {
+              "@anthropic-ai/claude-agent-sdk": "*",
+              "axios": "*"
+            }
+          }
+          PACKAGE_JSON
+
           cat > analyze.js << 'ANALYSIS_SCRIPT'
-          const { spawn } = require('child_process');
-          const fs = require('fs');
-          const path = require('path');
+          import { query } from '@anthropic-ai/claude-agent-sdk';
+          import fs from 'fs';
+          import axios from 'axios';
 
           // Get inputs from environment
           const featureId = process.env.FEATURE_ID;
@@ -150,106 +153,151 @@ jobs:
           }
           `;
 
-          console.log('Starting Claude Code analysis...');
+          console.log('Starting Claude Agent SDK analysis...');
           console.log('Feature ID:', featureId);
           console.log('Timestamp:', timestamp);
-          console.log('---');
+          console.log('---\n');
 
-          // Execute Claude Code CLI in programmatic mode with -p flag
-          const claude = spawn('claude', ['-p', analysisPrompt], {
-            env: {
-              ...process.env,
-              ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY
-            }
-          });
-
-          let output = '';
-          let errorOutput = '';
-
-          claude.stdout.on('data', (data) => {
-            const chunk = data.toString();
-            output += chunk;
-            process.stdout.write(chunk);
-          });
-
-          claude.stderr.on('data', (data) => {
-            const chunk = data.toString();
-            errorOutput += chunk;
-            process.stderr.write(chunk);
-          });
-
-          claude.on('close', async (code) => {
-            console.log('\n---');
-            console.log('Claude Code completed with code:', code);
-
-            if (code !== 0) {
-              console.error('Analysis failed:', errorOutput);
-              process.exit(1);
-            }
-
-            // Try to extract JSON from the output
-            let analysisResult;
+          async function runAnalysis() {
             try {
-              // Look for JSON in the output (Claude might add markdown formatting)
-              const jsonMatch = output.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                analysisResult = JSON.parse(jsonMatch[0]);
-              } else {
-                // If no JSON found, wrap the output
+              // Configure SDK options for CI/automation
+              const options = {
+                permissionMode: 'bypassPermissions',
+                allowDangerouslySkipPermissions: true,
+                allowedTools: ['Read', 'Glob', 'Grep', 'Bash'],
+                maxTurns: 10,
+                maxBudgetUsd: 2.00,
+                apiKey: process.env.ANTHROPIC_API_KEY
+              };
+
+              console.log('Executing query with SDK...\n');
+
+              let fullOutput = '';
+              let jsonOutput = null;
+
+              // Iterate through the async generator
+              for await (const message of query({ prompt: analysisPrompt, options })) {
+                // Handle different message types
+                if (message.type === 'system') {
+                  console.log('[SYSTEM]', message.content);
+                } else if (message.type === 'assistant') {
+                  // Accumulate assistant messages
+                  const content = message.content || '';
+                  fullOutput += content;
+                  process.stdout.write(content);
+                } else if (message.type === 'result') {
+                  console.log('\n[RESULT]', JSON.stringify(message, null, 2));
+
+                  // Try to extract structured output
+                  if (message.content) {
+                    fullOutput += message.content;
+                  }
+                } else {
+                  // Handle other message types
+                  console.log(`\n[${message.type?.toUpperCase() || 'UNKNOWN'}]`, message);
+                }
+              }
+
+              console.log('\n\n---');
+              console.log('Claude Agent SDK analysis complete');
+
+              // Try to extract JSON from the output
+              let analysisResult;
+              try {
+                // Look for JSON in the output (Claude might add markdown formatting)
+                const jsonMatch = fullOutput.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                  analysisResult = JSON.parse(jsonMatch[0]);
+                  console.log('Successfully parsed structured JSON output');
+                } else {
+                  // If no JSON found, wrap the output
+                  console.warn('Could not find JSON in output, wrapping raw output');
+                  analysisResult = {
+                    feature_id: featureId,
+                    raw_output: fullOutput,
+                    error: "Could not parse structured JSON from Claude response"
+                  };
+                }
+              } catch (parseError) {
+                console.error('Failed to parse JSON:', parseError.message);
                 analysisResult = {
                   feature_id: featureId,
-                  raw_output: output,
-                  error: "Could not parse structured JSON from Claude response"
+                  raw_output: fullOutput,
+                  error: parseError.message
                 };
               }
-            } catch (parseError) {
-              console.error('Failed to parse JSON:', parseError);
-              analysisResult = {
-                feature_id: featureId,
-                raw_output: output,
-                error: parseError.message
+
+              // Add metadata
+              analysisResult.metadata = {
+                analyzed_at: timestamp,
+                workflow_run_id: process.env.GITHUB_RUN_ID,
+                workflow_run_number: process.env.GITHUB_RUN_NUMBER,
+                repository: process.env.GITHUB_REPOSITORY,
+                actor: process.env.GITHUB_ACTOR
               };
-            }
 
-            // Add metadata
-            analysisResult.metadata = {
-              analyzed_at: timestamp,
-              workflow_run_id: process.env.GITHUB_RUN_ID,
-              workflow_run_number: process.env.GITHUB_RUN_NUMBER,
-              repository: process.env.GITHUB_REPOSITORY,
-              actor: process.env.GITHUB_ACTOR
-            };
+              // Save results to file
+              const outputFile = '/tmp/analysis-result.json';
+              fs.writeFileSync(outputFile, JSON.stringify(analysisResult, null, 2));
+              console.log('Analysis results saved to:', outputFile);
 
-            // Save results to file
-            const outputFile = '/tmp/analysis-result.json';
-            fs.writeFileSync(outputFile, JSON.stringify(analysisResult, null, 2));
-            console.log('Analysis results saved to:', outputFile);
-
-            // Post to callback URL if provided
-            if (callbackUrl && callbackUrl.trim() !== '') {
-              console.log('\nPosting results to callback URL:', callbackUrl);
-              try {
-                const axios = require('axios');
-                const response = await axios.post(callbackUrl, analysisResult, {
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'X-Feature-ID': featureId,
-                    'X-Workflow-Run-ID': process.env.GITHUB_RUN_ID
-                  },
-                  timeout: 10000
-                });
-                console.log('Callback response status:', response.status);
-                console.log('Callback response:', response.data);
-              } catch (callbackError) {
-                console.error('Failed to post to callback URL:', callbackError.message);
-                console.log('Note: This is simulated and may fail in testing');
+              // Post to callback URL if provided
+              if (callbackUrl && callbackUrl.trim() !== '') {
+                console.log('\nPosting results to callback URL:', callbackUrl);
+                try {
+                  const response = await axios.post(callbackUrl, analysisResult, {
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'X-Feature-ID': featureId,
+                      'X-Workflow-Run-ID': process.env.GITHUB_RUN_ID
+                    },
+                    timeout: 10000
+                  });
+                  console.log('Callback response status:', response.status);
+                  console.log('Callback response:', response.data);
+                } catch (callbackError) {
+                  console.error('Failed to post to callback URL:', callbackError.message);
+                  if (callbackError.response) {
+                    console.error('Response status:', callbackError.response.status);
+                    console.error('Response data:', callbackError.response.data);
+                  }
+                }
               }
-            }
 
-            console.log('\n=== ANALYSIS COMPLETE ===');
-            console.log(JSON.stringify(analysisResult, null, 2));
-          });
+              console.log('\n=== ANALYSIS COMPLETE ===');
+              console.log(JSON.stringify(analysisResult, null, 2));
+
+            } catch (error) {
+              console.error('\nAnalysis failed with error:');
+              console.error(error);
+
+              // Save error result
+              const errorResult = {
+                feature_id: featureId,
+                error: error.message,
+                stack: error.stack,
+                metadata: {
+                  analyzed_at: timestamp,
+                  workflow_run_id: process.env.GITHUB_RUN_ID,
+                  workflow_run_number: process.env.GITHUB_RUN_NUMBER,
+                  repository: process.env.GITHUB_REPOSITORY,
+                  actor: process.env.GITHUB_ACTOR
+                }
+              };
+
+              const outputFile = '/tmp/analysis-result.json';
+              fs.writeFileSync(outputFile, JSON.stringify(errorResult, null, 2));
+
+              process.exit(1);
+            }
+          }
+
+          // Run the analysis
+          runAnalysis();
           ANALYSIS_SCRIPT
+
+      - name: Install dependencies
+        run: npm install
 
       - name: Run feature analysis
         env:

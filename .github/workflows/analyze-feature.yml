@@ -42,8 +42,7 @@ jobs:
 
       - name: Create analysis script
         run: |
-          # Create package.json for ES6 module support
-          cat > package.json << 'PACKAGE_JSON'
+          cat > package.json << 'EOF'
           {
             "type": "module",
             "dependencies": {
@@ -51,160 +50,29 @@ jobs:
               "axios": "*"
             }
           }
-          PACKAGE_JSON
+          EOF
 
-          cat > analyze.js << 'ANALYSIS_SCRIPT'
+          cat > analyze.js << 'EOF'
           import { query } from '@anthropic-ai/claude-agent-sdk';
           import fs from 'fs';
           import axios from 'axios';
 
-          // Get inputs from environment
           const featureId = process.env.FEATURE_ID;
           const featureDescription = process.env.FEATURE_DESCRIPTION;
           const callbackUrl = process.env.CALLBACK_URL;
           const timestamp = process.env.TIMESTAMP;
+          const systemPrompt = process.env.SYSTEM_PROMPT;
+          const userPromptTemplate = process.env.USER_PROMPT_TEMPLATE;
 
-          // Check if feature_description is a file path
           let featureContent = featureDescription;
           if (featureDescription.endsWith('.md') && fs.existsSync(featureDescription)) {
             featureContent = fs.readFileSync(featureDescription, 'utf8');
-            console.log(`Loaded feature description from: ${featureDescription}`);
+            console.log('Loaded feature description from: ' + featureDescription);
           }
 
-          // System Prompt: Define agent behavior and analysis methodology
-          const systemPrompt = \`
-You are a senior software architect specializing in feature estimation and technical planning.
-
-ANALYSIS METHODOLOGY - ALWAYS FOLLOW:
-
-1. EXPLORATION PHASE (Required First Step):
-   - Use Glob to search for backend code (*.py, *.js, *.ts, src/, app/, backend/)
-   - Use Glob to search for frontend code (*.vue, *.jsx, *.tsx, components/, views/)
-   - Use Grep to find database models, API endpoints, authentication systems
-   - Use Read to examine key files and understand the codebase structure
-   - Classify repository maturity: empty | early | partial | mature
-
-2. REALISTIC ESTIMATION PRINCIPLES:
-   - If NO production code exists, include FULL platform build effort (infrastructure, auth, db, CRUD, CI/CD)
-   - Never assume infrastructure exists based solely on design documents
-   - Separate prerequisite work from feature-specific work
-   - Be honest about estimation uncertainty when foundation is missing
-
-3. WARNING GENERATION (Critical):
-   - ALWAYS add warnings when repository lacks necessary foundation
-   - Be explicit about prerequisite work that must be completed first
-   - Explain how missing infrastructure affects the estimate
-   - Use appropriate severity levels (critical, high, medium, low)
-
-4. OUTPUT REQUIREMENTS:
-   - Provide structured JSON response
-   - Include repository_state assessment
-   - Calculate both prerequisite_hours and feature-specific estimated_hours
-   - Tag tasks as "prerequisite" or "feature" type
-   - Order tasks logically (all prerequisites before feature tasks)
-\`;
-
-          // User Prompt: The specific task and feature description
-          const userPrompt = \`
-Analyze the following feature request for implementation planning.
-
-Feature ID: ${featureId}
-Feature Description:
-${featureContent}
-
-Please provide your analysis in the following structured response format:
-
-          1. COMPLEXITY ESTIMATION:
-             - Estimated story points (1, 2, 3, 5, 8, 13, 21)
-             - Estimated implementation time (hours)
-             - Complexity level (Low, Medium, High, Very High)
-             - Rationale for the estimation
-
-          2. AFFECTED MODULES/FILES:
-             - List all modules or components that would need changes
-             - For each, indicate: path, type of change (new/modify/delete), and reason
-
-          3. IMPLEMENTATION TASKS:
-             - If infrastructure is missing, include PREREQUISITE tasks first (platform setup, auth, db, etc.)
-             - Then include tasks specific to this feature
-             - Break down into specific, actionable tasks
-             - Each task should have: description, estimated effort, dependencies, priority, and task_type
-             - Use task_type: "prerequisite" for infrastructure work, "feature" for the actual feature
-             - Order tasks logically with all prerequisites before feature tasks
-
-          4. TECHNICAL RISKS:
-             - Identify potential technical challenges
-             - Security considerations
-             - Performance implications
-             - Breaking changes or backward compatibility issues
-             - External dependencies or API changes needed
-
-          5. RECOMMENDATIONS:
-             - Suggested implementation approach
-             - Alternative solutions to consider
-             - Testing strategy
-             - Deployment considerations
-
-          Please provide your response in valid JSON format with the following structure:
-          {
-            "feature_id": "${featureId}",
-            "warnings": [
-              {
-                "type": "missing_infrastructure|estimation_uncertainty|prerequisite_required|other",
-                "severity": "critical|high|medium|low",
-                "message": "string - clear explanation of the warning",
-                "impact": "string - how this affects the estimate or implementation"
-              }
-            ],
-            "repository_state": {
-              "has_backend_code": boolean,
-              "has_frontend_code": boolean,
-              "has_database_models": boolean,
-              "has_authentication": boolean,
-              "maturity_level": "empty|early|partial|mature",
-              "notes": "string - brief summary of what exists"
-            },
-            "complexity": {
-              "story_points": number,
-              "estimated_hours": number,
-              "prerequisite_hours": number,
-              "total_hours": number,
-              "level": "Low|Medium|High|Very High",
-              "rationale": "string"
-            },
-            "affected_modules": [
-              {
-                "path": "string",
-                "change_type": "new|modify|delete",
-                "reason": "string"
-              }
-            ],
-            "implementation_tasks": [
-              {
-                "id": "string",
-                "task_type": "prerequisite|feature",
-                "description": "string",
-                "estimated_effort_hours": number,
-                "dependencies": ["string"],
-                "priority": "high|medium|low"
-              }
-            ],
-            "technical_risks": [
-              {
-                "category": "security|performance|compatibility|dependencies|other",
-                "description": "string",
-                "severity": "low|medium|high|critical",
-                "mitigation": "string"
-              }
-            ],
-            "recommendations": {
-              "approach": "string",
-              "alternatives": ["string"],
-              "testing_strategy": "string",
-              "deployment_notes": "string"
-            }
-          }
-\`;
+          const userPrompt = userPromptTemplate
+            .replace('{{FEATURE_ID}}', featureId)
+            .replace('{{FEATURE_CONTENT}}', featureContent);
 
           console.log('Starting Claude Agent SDK analysis...');
           console.log('Feature ID:', featureId);
@@ -213,13 +81,12 @@ Please provide your analysis in the following structured response format:
 
           async function runAnalysis() {
             try {
-              // Configure SDK options for CI/automation
               const options = {
-                systemPrompt: systemPrompt,  // Agent behavior and methodology
+                systemPrompt: systemPrompt,
                 permissionMode: 'bypassPermissions',
                 allowDangerouslySkipPermissions: true,
                 allowedTools: ['Read', 'Glob', 'Grep', 'Bash'],
-                maxTurns: 30,  // Increased from 10 to allow repo exploration + analysis
+                maxTurns: 30,
                 maxBudgetUsd: 2.00,
                 apiKey: process.env.ANTHROPIC_API_KEY
               };
@@ -229,25 +96,19 @@ Please provide your analysis in the following structured response format:
               let fullOutput = '';
               let resultContent = null;
 
-              // Iterate through the async generator
               for await (const message of query({ prompt: userPrompt, options })) {
-                // Handle different message types
                 if (message.type === 'system') {
-                  // System messages contain metadata, not content
                   console.log('[SYSTEM]', JSON.stringify({
                     model: message.model,
                     tools: message.tools,
                     cwd: message.cwd
                   }));
                 } else if (message.type === 'assistant') {
-                  // Accumulate assistant messages
                   const content = message.content || '';
                   fullOutput += content;
                   process.stdout.write(content);
                 } else if (message.type === 'result') {
                   console.log('\n[RESULT]', JSON.stringify(message, null, 2));
-
-                  // Extract the result field which contains the full analysis
                   if (message.result) {
                     resultContent = message.result;
                     console.log('\nExtracted result content from message.result');
@@ -256,26 +117,22 @@ Please provide your analysis in the following structured response format:
                     console.log('\nExtracted result content from message.content (fallback)');
                   }
                 } else {
-                  // Handle other message types
-                  console.log(`\n[${message.type?.toUpperCase() || 'UNKNOWN'}]`, message);
+                  console.log('\n[' + (message.type?.toUpperCase() || 'UNKNOWN') + ']', message);
                 }
               }
 
               console.log('\n\n---');
               console.log('Claude Agent SDK analysis complete');
 
-              // Try to extract JSON from the result
               let analysisResult;
               const contentToAnalyze = resultContent || fullOutput;
 
               try {
-                // Look for JSON in the result content (Claude might add markdown formatting)
                 const jsonMatch = contentToAnalyze.match(/\{[\s\S]*\}/);
                 if (jsonMatch) {
                   analysisResult = JSON.parse(jsonMatch[0]);
                   console.log('Successfully parsed structured JSON output');
                 } else {
-                  // If no JSON found, wrap the output
                   console.warn('Could not find JSON in output, wrapping raw output');
                   analysisResult = {
                     feature_id: featureId,
@@ -292,7 +149,6 @@ Please provide your analysis in the following structured response format:
                 };
               }
 
-              // Add metadata
               analysisResult.metadata = {
                 analyzed_at: timestamp,
                 workflow_run_id: process.env.GITHUB_RUN_ID,
@@ -301,12 +157,10 @@ Please provide your analysis in the following structured response format:
                 actor: process.env.GITHUB_ACTOR
               };
 
-              // Save results to file
               const outputFile = '/tmp/analysis-result.json';
               fs.writeFileSync(outputFile, JSON.stringify(analysisResult, null, 2));
               console.log('Analysis results saved to:', outputFile);
 
-              // Post to callback URL if provided
               if (callbackUrl && callbackUrl.trim() !== '') {
                 console.log('\nPosting results to callback URL:', callbackUrl);
                 try {
@@ -336,7 +190,6 @@ Please provide your analysis in the following structured response format:
               console.error('\nAnalysis failed with error:');
               console.error(error);
 
-              // Save error result
               const errorResult = {
                 feature_id: featureId,
                 error: error.message,
@@ -357,9 +210,8 @@ Please provide your analysis in the following structured response format:
             }
           }
 
-          // Run the analysis
           runAnalysis();
-          ANALYSIS_SCRIPT
+          EOF
 
       - name: Install dependencies
         run: npm install
@@ -375,6 +227,135 @@ Please provide your analysis in the following structured response format:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_ACTOR: ${{ github.actor }}
+          SYSTEM_PROMPT: |
+            You are a senior software architect specializing in feature estimation and technical planning.
+
+            ANALYSIS METHODOLOGY - ALWAYS FOLLOW:
+
+            1. EXPLORATION PHASE (Required First Step):
+               - Use Glob to search for backend code (*.py, *.js, *.ts, src/, app/, backend/)
+               - Use Glob to search for frontend code (*.vue, *.jsx, *.tsx, components/, views/)
+               - Use Grep to find database models, API endpoints, authentication systems
+               - Use Read to examine key files and understand the codebase structure
+               - Classify repository maturity: empty | early | partial | mature
+
+            2. REALISTIC ESTIMATION PRINCIPLES:
+               - If NO production code exists, include FULL platform build effort (infrastructure, auth, db, CRUD, CI/CD)
+               - Never assume infrastructure exists based solely on design documents
+               - Separate prerequisite work from feature-specific work
+               - Be honest about estimation uncertainty when foundation is missing
+
+            3. WARNING GENERATION (Critical):
+               - ALWAYS add warnings when repository lacks necessary foundation
+               - Be explicit about prerequisite work that must be completed first
+               - Explain how missing infrastructure affects the estimate
+               - Use appropriate severity levels (critical, high, medium, low)
+
+            4. OUTPUT REQUIREMENTS:
+               - Provide structured JSON response
+               - Include repository_state assessment
+               - Calculate both prerequisite_hours and feature-specific estimated_hours
+               - Tag tasks as "prerequisite" or "feature" type
+               - Order tasks logically (all prerequisites before feature tasks)
+          USER_PROMPT_TEMPLATE: |
+            Analyze the following feature request for implementation planning.
+
+            Feature ID: {{FEATURE_ID}}
+            Feature Description:
+            {{FEATURE_CONTENT}}
+
+            Please provide your analysis in the following structured response format:
+
+            1. COMPLEXITY ESTIMATION:
+               - Estimated story points (1, 2, 3, 5, 8, 13, 21)
+               - Estimated implementation time (hours)
+               - Complexity level (Low, Medium, High, Very High)
+               - Rationale for the estimation
+
+            2. AFFECTED MODULES/FILES:
+               - List all modules or components that would need changes
+               - For each, indicate: path, type of change (new/modify/delete), and reason
+
+            3. IMPLEMENTATION TASKS:
+               - If infrastructure is missing, include PREREQUISITE tasks first (platform setup, auth, db, etc.)
+               - Then include tasks specific to this feature
+               - Break down into specific, actionable tasks
+               - Each task should have: description, estimated effort, dependencies, priority, and task_type
+               - Use task_type: "prerequisite" for infrastructure work, "feature" for the actual feature
+               - Order tasks logically with all prerequisites before feature tasks
+
+            4. TECHNICAL RISKS:
+               - Identify potential technical challenges
+               - Security considerations
+               - Performance implications
+               - Breaking changes or backward compatibility issues
+               - External dependencies or API changes needed
+
+            5. RECOMMENDATIONS:
+               - Suggested implementation approach
+               - Alternative solutions to consider
+               - Testing strategy
+               - Deployment considerations
+
+            Please provide your response in valid JSON format with the following structure:
+            {
+              "feature_id": "{{FEATURE_ID}}",
+              "warnings": [
+                {
+                  "type": "missing_infrastructure|estimation_uncertainty|prerequisite_required|other",
+                  "severity": "critical|high|medium|low",
+                  "message": "string - clear explanation of the warning",
+                  "impact": "string - how this affects the estimate or implementation"
+                }
+              ],
+              "repository_state": {
+                "has_backend_code": boolean,
+                "has_frontend_code": boolean,
+                "has_database_models": boolean,
+                "has_authentication": boolean,
+                "maturity_level": "empty|early|partial|mature",
+                "notes": "string - brief summary of what exists"
+              },
+              "complexity": {
+                "story_points": number,
+                "estimated_hours": number,
+                "prerequisite_hours": number,
+                "total_hours": number,
+                "level": "Low|Medium|High|Very High",
+                "rationale": "string"
+              },
+              "affected_modules": [
+                {
+                  "path": "string",
+                  "change_type": "new|modify|delete",
+                  "reason": "string"
+                }
+              ],
+              "implementation_tasks": [
+                {
+                  "id": "string",
+                  "task_type": "prerequisite|feature",
+                  "description": "string",
+                  "estimated_effort_hours": number,
+                  "dependencies": ["string"],
+                  "priority": "high|medium|low"
+                }
+              ],
+              "technical_risks": [
+                {
+                  "category": "security|performance|compatibility|dependencies|other",
+                  "description": "string",
+                  "severity": "low|medium|high|critical",
+                  "mitigation": "string"
+                }
+              ],
+              "recommendations": {
+                "approach": "string",
+                "alternatives": ["string"],
+                "testing_strategy": "string",
+                "deployment_notes": "string"
+              }
+            }
         run: node analyze.js
 
       - name: Upload analysis results

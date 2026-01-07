@@ -79,7 +79,23 @@ jobs:
           Feature Description:
           ${featureContent}
 
-          Repository Context: This is a product analysis repository that appears to contain experiments and analysis tools.
+          CRITICAL INSTRUCTIONS - READ FIRST:
+
+          1. BEFORE estimating, explore this repository thoroughly to understand its current state:
+             - Use Glob/Grep to search for backend code (*.py, *.js, *.ts, src/, app/, backend/)
+             - Use Glob/Grep to search for frontend code (*.vue, *.jsx, *.tsx, components/, views/)
+             - Use Read to check if core infrastructure exists (database models, API endpoints, authentication)
+             - Determine if this is: (a) empty/docs-only repo, (b) partial implementation, or (c) mature codebase
+
+          2. BE REALISTIC about prerequisites:
+             - If NO production code exists, calculate the FULL effort including building the entire platform first
+             - Include infrastructure setup, authentication, database, basic CRUD, CI/CD, etc. in your estimate
+             - Don't assume infrastructure exists just because design documents mention it
+
+          3. ADD EXPLICIT WARNINGS:
+             - If the repository lacks the necessary foundation code, add a critical warning
+             - Be transparent about estimation uncertainty when infrastructure is missing
+             - Explain what prerequisite work must be completed before this feature can be estimated accurately
 
           Please analyze this feature request and provide a structured response with the following:
 
@@ -94,9 +110,12 @@ jobs:
              - For each, indicate: path, type of change (new/modify/delete), and reason
 
           3. IMPLEMENTATION TASKS:
+             - If infrastructure is missing, include PREREQUISITE tasks first (platform setup, auth, db, etc.)
+             - Then include tasks specific to this feature
              - Break down into specific, actionable tasks
-             - Each task should have: description, estimated effort, dependencies, priority
-             - Order tasks logically
+             - Each task should have: description, estimated effort, dependencies, priority, and task_type
+             - Use task_type: "prerequisite" for infrastructure work, "feature" for the actual feature
+             - Order tasks logically with all prerequisites before feature tasks
 
           4. TECHNICAL RISKS:
              - Identify potential technical challenges
@@ -114,9 +133,27 @@ jobs:
           Please provide your response in valid JSON format with the following structure:
           {
             "feature_id": "${featureId}",
+            "warnings": [
+              {
+                "type": "missing_infrastructure|estimation_uncertainty|prerequisite_required|other",
+                "severity": "critical|high|medium|low",
+                "message": "string - clear explanation of the warning",
+                "impact": "string - how this affects the estimate or implementation"
+              }
+            ],
+            "repository_state": {
+              "has_backend_code": boolean,
+              "has_frontend_code": boolean,
+              "has_database_models": boolean,
+              "has_authentication": boolean,
+              "maturity_level": "empty|early|partial|mature",
+              "notes": "string - brief summary of what exists"
+            },
             "complexity": {
               "story_points": number,
               "estimated_hours": number,
+              "prerequisite_hours": number,
+              "total_hours": number,
               "level": "Low|Medium|High|Very High",
               "rationale": "string"
             },
@@ -130,6 +167,7 @@ jobs:
             "implementation_tasks": [
               {
                 "id": "string",
+                "task_type": "prerequisite|feature",
                 "description": "string",
                 "estimated_effort_hours": number,
                 "dependencies": ["string"],

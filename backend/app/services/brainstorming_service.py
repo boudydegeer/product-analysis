@@ -1,7 +1,9 @@
 """Service for AI-powered brainstorming with Claude Agent SDK."""
 import logging
+import os
 from typing import AsyncGenerator, Any
-from claude_agent_sdk import Agent, AgentResponse
+from claude_agent_sdk import ClaudeSDKClient
+from claude_agent_sdk.types import ClaudeAgentOptions
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +39,16 @@ You have access to WebSearch and WebFetch tools for research."""
         """
         self.api_key = api_key
         self.model = model
-        self.agent = Agent(
-            api_key=api_key,
+
+        # Set API key in environment for Claude SDK
+        os.environ['ANTHROPIC_API_KEY'] = api_key
+
+        # Initialize client with options
+        options = ClaudeAgentOptions(
             model=model,
             system_prompt=self.SYSTEM_PROMPT,
         )
+        self.client = ClaudeSDKClient(options=options)
 
     async def stream_brainstorm_message(
         self, messages: list[dict[str, str]]
@@ -55,27 +62,31 @@ You have access to WebSearch and WebFetch tools for research."""
             Text chunks from Claude's response
         """
         try:
-            # Get the last user message
-            if not messages:
-                return
+            # Build the prompt from the conversation history
+            prompt_parts = []
+            for msg in messages:
+                role = msg["role"]
+                content = msg["content"]
+                if role == "user":
+                    prompt_parts.append(f"User: {content}")
+                else:
+                    prompt_parts.append(f"Assistant: {content}")
 
-            last_message = messages[-1]["content"] if messages else ""
-
-            # Build conversation history for context (all messages except the last one)
-            conversation_history = [
-                {"role": msg["role"], "content": msg["content"]}
-                for msg in messages[:-1]
-            ]
+            prompt = "\n\n".join(prompt_parts)
 
             # Stream response from agent
-            async for chunk in self.agent.stream(
-                prompt=last_message,
-                conversation_history=conversation_history,
-            ):
-                if isinstance(chunk, str):
-                    yield chunk
-                elif hasattr(chunk, 'content'):
-                    yield chunk.content
+            async for event in self.client.stream_query(prompt):
+                # Extract text from different event types
+                if hasattr(event, 'content') and isinstance(event.content, str):
+                    yield event.content
+                elif hasattr(event, 'text') and isinstance(event.text, str):
+                    yield event.text
+                elif isinstance(event, dict) and 'content' in event:
+                    yield event['content']
+                elif isinstance(event, dict) and 'text' in event:
+                    yield event['text']
+                elif isinstance(event, str):
+                    yield event
 
         except Exception as e:
             logger.error(f"Error streaming brainstorm message: {e}")

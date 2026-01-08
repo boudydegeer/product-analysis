@@ -2,8 +2,10 @@
 import logging
 import json
 import re
+import os
 from typing import Any
 from claude_agent_sdk import ClaudeSDKClient
+from claude_agent_sdk.types import ClaudeAgentOptions
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +42,16 @@ Be objective, concise, and data-driven in your analysis."""
         """
         self.api_key = api_key
         self.model = model
-        self.agent = ClaudeSDKClient(
-            api_key=api_key,
+
+        # Set API key in environment for Claude SDK
+        os.environ['ANTHROPIC_API_KEY'] = api_key
+
+        # Initialize client with options
+        options = ClaudeAgentOptions(
             model=model,
             system_prompt=self.SYSTEM_PROMPT,
         )
+        self.client = ClaudeSDKClient(options=options)
 
     async def evaluate_idea(
         self, title: str, description: str, context: str | None = None
@@ -75,18 +82,20 @@ Description: {description}"""
 
             prompt += "\n\nProvide your evaluation as JSON."
 
-            # Call Claude Agent
-            response = await self.agent.run(prompt=prompt)
-
-            # Extract text from response
-            if isinstance(response, str):
-                response_text = response
-            elif hasattr(response, 'content'):
-                response_text = response.content
-            elif hasattr(response, 'text'):
-                response_text = response.text
-            else:
-                response_text = str(response)
+            # Call Claude Agent (non-streaming)
+            response_text = ""
+            async for event in self.client.stream_query(prompt):
+                # Accumulate the response
+                if hasattr(event, 'content') and isinstance(event.content, str):
+                    response_text += event.content
+                elif hasattr(event, 'text') and isinstance(event.text, str):
+                    response_text += event.text
+                elif isinstance(event, dict) and 'content' in event:
+                    response_text += event['content']
+                elif isinstance(event, dict) and 'text' in event:
+                    response_text += event['text']
+                elif isinstance(event, str):
+                    response_text += event
 
             # Parse response
             result = self._parse_evaluation_result(response_text)

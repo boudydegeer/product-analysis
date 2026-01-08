@@ -3,7 +3,7 @@ import logging
 import json
 import re
 from typing import Any
-from claude_agent_sdk import Agent
+from claude_agent_sdk import ClaudeSDKClient
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ Be objective, concise, and data-driven in your analysis."""
         """
         self.api_key = api_key
         self.model = model
-        self.agent = Agent(
+        self.agent = ClaudeSDKClient(
             api_key=api_key,
             model=model,
             system_prompt=self.SYSTEM_PROMPT,

@@ -72,7 +72,14 @@ def test_create_analysis_with_flattened_fields(session):
         risks_security_concerns=[{"severity": "medium"}],
         risks_scalability_issues=[{"severity": "low"}],
         risks_mitigation_strategies=["Strategy 1"],
-        recommendations_improvements=[{"priority": "high"}],
+        recommendations_improvements=[
+            {
+                "priority": "high",
+                "title": "Test improvement",
+                "description": "Test description",
+                "effort": "2 days",
+            }
+        ],
         recommendations_best_practices=["Practice 1"],
         recommendations_next_steps=["Next step 1"],
     )

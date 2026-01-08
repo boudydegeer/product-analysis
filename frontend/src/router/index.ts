@@ -23,7 +23,7 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Features' }
       },
       {
-        path: 'analysis',
+        path: 'analysis/:id',
         name: 'analysis',
         component: AnalysisView,
         meta: { title: 'Analysis' }

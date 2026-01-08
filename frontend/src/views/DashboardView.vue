@@ -46,39 +46,23 @@
         Go to Features
       </Button>
     </div>
-
-    <AnalysisDialog
-      v-model:open="showAnalysisDialog"
-      :feature-id="selectedFeatureId"
-      :feature-name="selectedFeatureName"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useFeaturesStore } from '@/stores/features'
 import Card from '@/components/ui/card.vue'
 import Badge from '@/components/ui/badge.vue'
 import Button from '@/components/ui/button.vue'
 import type { FeatureStatus } from '@/types/feature'
-import AnalysisDialog from '@/components/analysis/AnalysisDialog.vue'
 
 const store = useFeaturesStore()
-const showAnalysisDialog = ref(false)
-const selectedFeatureId = ref<string>('')
-const selectedFeatureName = ref<string>('')
+const router = useRouter()
 
 function openAnalysis(featureId: string, featureName: string) {
-  selectedFeatureId.value = featureId
-  selectedFeatureName.value = featureName
-  showAnalysisDialog.value = true
-}
-
-function closeAnalysis() {
-  showAnalysisDialog.value = false
-  selectedFeatureId.value = ''
-  selectedFeatureName.value = ''
+  router.push({ name: 'analysis', params: { id: featureId } })
 }
 
 onMounted(() => {

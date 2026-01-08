@@ -292,7 +292,7 @@ jobs:
                - External dependencies or API changes needed
 
             5. RECOMMENDATIONS:
-               - Suggested implementation approach
+               - Priority improvements (structured with priority, title, description, effort)
                - Alternative solutions to consider
                - Testing strategy
                - Deployment considerations
@@ -350,10 +350,17 @@ jobs:
                 }
               ],
               "recommendations": {
-                "approach": "string",
+                "improvements": [
+                  {
+                    "priority": "high|medium|low",
+                    "title": "string - short title (max 60 chars)",
+                    "description": "string - detailed explanation of why and how",
+                    "effort": "string - estimated time (e.g., '1-2 days', '1 week')"
+                  }
+                ],
                 "alternatives": ["string"],
-                "testing_strategy": "string",
-                "deployment_notes": "string"
+                "best_practices": ["string"],
+                "next_steps": ["string"]
               }
             }
         run: node analyze.js

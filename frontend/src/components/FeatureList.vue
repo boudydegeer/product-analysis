@@ -73,7 +73,8 @@
       <Card
         v-for="feature in store.features"
         :key="feature.id"
-        class="p-6 hover:shadow-md transition-shadow"
+        class="p-6 hover:shadow-md transition-shadow cursor-pointer"
+        @click="handleViewFeature(feature.id)"
       >
         <div class="flex items-start justify-between">
           <div class="flex-1 space-y-2">
@@ -88,7 +89,7 @@
           </div>
           <div class="flex gap-2 ml-4">
             <Button
-              @click="handleAnalyze(feature.id)"
+              @click.stop="handleAnalyze(feature.id)"
               :disabled="feature.status === 'analyzing'"
               variant="secondary"
               size="sm"
@@ -96,7 +97,7 @@
               {{ feature.status === 'analyzing' ? 'Analyzing...' : 'Analyze' }}
             </Button>
             <Button
-              @click="handleDelete(feature.id)"
+              @click.stop="handleDelete(feature.id)"
               variant="destructive"
               size="sm"
             >
@@ -122,6 +123,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useFeaturesStore } from '@/stores/features'
 import type { FeatureStatus } from '@/types/feature'
 import { Plus, Trash2 } from 'lucide-vue-next'
@@ -135,6 +137,7 @@ import Textarea from '@/components/ui/textarea.vue'
 import Label from '@/components/ui/label.vue'
 
 const store = useFeaturesStore()
+const router = useRouter()
 const showCreateForm = ref(false)
 const newFeature = ref({
   id: '',
@@ -145,6 +148,10 @@ const newFeature = ref({
 onMounted(() => {
   store.fetchFeatures()
 })
+
+function handleViewFeature(id: string) {
+  router.push({ name: 'analysis', params: { id } })
+}
 
 async function handleCreate() {
   try {

@@ -80,27 +80,36 @@ async def test_full_analysis_flow(async_client: AsyncClient, db_session: AsyncSe
     db_session.add(feature)
     await db_session.commit()
 
-    # 2. Simulate webhook receiving analysis result
+    # 2. Simulate webhook receiving analysis result (using real workflow structure)
     webhook_payload = {
         "feature_id": feature_id,
         "complexity": {
-            "summary": {
-                "overview": "Test flow overview",
-                "key_points": ["Flow point 1"],
-                "metrics": {"complexity": "low"},
-            },
-            "implementation": {
-                "architecture": {"pattern": "Flow pattern"},
-                "technical_details": [],
-                "data_flow": {},
-            },
+            "story_points": 3,
+            "estimated_hours": 8,
+            "prerequisite_hours": 0,
+            "total_hours": 8,
+            "level": "Medium",
+            "rationale": "Test flow overview",
         },
         "warnings": [],
         "repository_state": {},
-        "affected_modules": [],
+        "affected_modules": [
+            {"path": "/test/file.py", "change_type": "modify", "reason": "Test"}
+        ],
         "implementation_tasks": [],
         "technical_risks": [],
-        "recommendations": {"improvements": [], "best_practices": [], "next_steps": []},
+        "recommendations": {
+            "improvements": [
+                {
+                    "priority": "high",
+                    "title": "Test improvement",
+                    "description": "Test improvement description",
+                    "effort": "1 day",
+                }
+            ],
+            "best_practices": ["Best practice 1"],
+            "next_steps": ["Next step 1"],
+        },
         "error": None,
         "raw_output": "",
         "metadata": {},
@@ -125,6 +134,11 @@ async def test_full_analysis_flow(async_client: AsyncClient, db_session: AsyncSe
     data = analysis_response.json()
     assert data["feature_id"] == feature_id
     assert data["status"] == "completed"
-    assert data["overview"]["summary"] == "Test flow overview"
-    assert data["overview"]["key_points"] == ["Flow point 1"]
-    assert data["implementation"]["architecture"]["pattern"] == "Flow pattern"
+    # Overview data comes from complexity
+    assert data["overview"]["summary"] == "Medium"  # complexity.level
+    assert data["overview"]["key_points"] == ["Test flow overview"]  # complexity.rationale
+    # Recommendations should include the improvement
+    assert len(data["recommendations"]["improvements"]) == 1
+    assert data["recommendations"]["improvements"][0]["title"] == "Test improvement"
+    assert data["recommendations"]["improvements"][0]["priority"] == "high"
+    assert data["recommendations"]["improvements"][0]["effort"] == "1 day"

@@ -65,7 +65,7 @@ describe('Analysis Integration', () => {
           {
             priority: 'high',
             title: 'Test improvement',
-            description: 'Improve this',
+            description: 'Improve this feature',
             effort: '1 day',
           },
         ],

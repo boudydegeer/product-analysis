@@ -75,9 +75,16 @@ def test_analysis_detail_response_schema():
             "mitigation_strategies": [],
         },
         "recommendations": {
-            "improvements": [],
-            "best_practices": [],
-            "next_steps": [],
+            "improvements": [
+                {
+                    "priority": "high",
+                    "title": "Implement httpOnly cookies",
+                    "description": "Move token storage from localStorage to httpOnly cookies",
+                    "effort": "1-2 days",
+                }
+            ],
+            "best_practices": ["Use HTTPS in production"],
+            "next_steps": ["Conduct security audit"],
         },
     }
     response = AnalysisDetailResponse(**data)

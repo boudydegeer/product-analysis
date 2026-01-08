@@ -108,7 +108,20 @@ async def test_get_analysis_success(
         risks_security_concerns=[],
         risks_scalability_issues=[],
         risks_mitigation_strategies=["Strategy 1"],
-        recommendations_improvements=["Improvement suggestion 1", "Improvement suggestion 2"],
+        recommendations_improvements=[
+            {
+                "priority": "high",
+                "title": "Improvement suggestion 1",
+                "description": "Detailed description for improvement 1",
+                "effort": "2 days",
+            },
+            {
+                "priority": "medium",
+                "title": "Improvement suggestion 2",
+                "description": "Detailed description for improvement 2",
+                "effort": "1 day",
+            },
+        ],
         recommendations_best_practices=["Practice 1"],
         recommendations_next_steps=["Next step"],
     )

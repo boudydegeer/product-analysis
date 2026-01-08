@@ -86,11 +86,22 @@ class AnalysisRisksResponse(BaseModel):
     )
 
 
+class ImprovementItem(BaseModel):
+    """Individual improvement item with priority and effort estimation."""
+
+    priority: str = Field(..., description="Priority level: high, medium, or low")
+    title: str = Field(..., description="Short title (max 60 chars)")
+    description: str = Field(..., description="Detailed explanation of why and how")
+    effort: Optional[str] = Field(
+        None, description="Estimated time (e.g., '1-2 days', '1 week')"
+    )
+
+
 class AnalysisRecommendationsResponse(BaseModel):
     """Analysis recommendations section."""
 
-    improvements: list[str] = Field(
-        default_factory=list, description="Suggested improvements"
+    improvements: list[ImprovementItem] = Field(
+        default_factory=list, description="Priority improvements with details"
     )
     best_practices: list[str] = Field(
         default_factory=list, description="Best practices to follow"

@@ -80,14 +80,49 @@ def extract_flattened_fields(result_data: Dict[str, Any]) -> Dict[str, Any]:
     ]
 
     # Extract recommendation fields from recommendations
-    alternatives = recommendations.get("alternatives", [])
-    recommendations_improvements = [alternatives[i] for i in range(len(alternatives))]
+    # Handle both old format (string list) and new format (object list)
+    improvements = recommendations.get("improvements", [])
+    if improvements:
+        # Check if it's the new format (list of objects)
+        if isinstance(improvements[0], dict):
+            recommendations_improvements = improvements
+        else:
+            # Old format: convert strings to objects for backward compatibility
+            recommendations_improvements = [
+                {
+                    "priority": "medium",
+                    "title": imp[:60] if len(imp) <= 60 else imp[:57] + "...",
+                    "description": imp,
+                    "effort": None,
+                }
+                for imp in improvements
+            ]
+    else:
+        # Fallback: use alternatives for backward compatibility
+        alternatives = recommendations.get("alternatives", [])
+        recommendations_improvements = [
+            {
+                "priority": "medium",
+                "title": alt[:60] if len(alt) <= 60 else alt[:57] + "...",
+                "description": alt,
+                "effort": None,
+            }
+            for alt in alternatives
+        ]
 
-    testing_strategy = recommendations.get("testing_strategy")
-    recommendations_best_practices = [testing_strategy] if testing_strategy else []
+    # Extract best_practices (new field) or fallback to testing_strategy
+    best_practices = recommendations.get("best_practices", [])
+    if not best_practices:
+        testing_strategy = recommendations.get("testing_strategy")
+        best_practices = [testing_strategy] if testing_strategy else []
+    recommendations_best_practices = best_practices
 
-    approach = recommendations.get("approach")
-    recommendations_next_steps = [approach] if approach else []
+    # Extract next_steps (new field) or fallback to approach
+    next_steps = recommendations.get("next_steps", [])
+    if not next_steps:
+        approach = recommendations.get("approach")
+        next_steps = [approach] if approach else []
+    recommendations_next_steps = next_steps
 
     return {
         # Summary fields (from complexity)

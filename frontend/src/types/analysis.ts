@@ -52,7 +52,7 @@ export interface AnalysisRisks {
 }
 
 export interface Improvement {
-  priority: string
+  priority: 'high' | 'medium' | 'low'
   title: string
   description: string
   effort?: string

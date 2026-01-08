@@ -1,11 +1,7 @@
 """Test analysis response schemas."""
-import pytest
-from pydantic import ValidationError
 from app.schemas.analysis import (
     AnalysisOverviewResponse,
     AnalysisImplementationResponse,
-    AnalysisRisksResponse,
-    AnalysisRecommendationsResponse,
     AnalysisDetailResponse,
 )
 
@@ -61,7 +57,11 @@ def test_analysis_detail_response_schema():
         "overview": {
             "summary": "Test summary",
             "key_points": ["Point 1"],
-            "metrics": {"complexity": "low", "estimated_effort": "1 day", "confidence": 0.9},
+            "metrics": {
+                "complexity": "low",
+                "estimated_effort": "1 day",
+                "confidence": 0.9,
+            },
         },
         "implementation": {
             "architecture": {"pattern": "MVC", "components": []},

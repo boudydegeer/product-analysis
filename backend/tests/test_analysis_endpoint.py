@@ -68,7 +68,9 @@ async def db_session():
 
 
 @pytest.mark.asyncio
-async def test_get_analysis_success(async_client: AsyncClient, db_session: AsyncSession):
+async def test_get_analysis_success(
+    async_client: AsyncClient, db_session: AsyncSession
+):
     """Test getting analysis for a feature."""
     # Generate a valid UUID for testing
     feature_id = str(uuid4())
@@ -92,9 +94,15 @@ async def test_get_analysis_success(async_client: AsyncClient, db_session: Async
         completed_at=datetime.now(UTC),
         summary_overview="Test overview",
         summary_key_points=["Point 1", "Point 2"],
-        summary_metrics={"complexity": "medium", "estimated_effort": "3 days", "confidence": 0.85},
+        summary_metrics={
+            "complexity": "medium",
+            "estimated_effort": "3 days",
+            "confidence": 0.85,
+        },
         implementation_architecture={"pattern": "MVC", "components": ["Component1"]},
-        implementation_technical_details=[{"category": "Backend", "description": "Detail"}],
+        implementation_technical_details=[
+            {"category": "Backend", "description": "Detail"}
+        ],
         implementation_data_flow={"description": "Flow", "steps": ["Step 1"]},
         risks_technical_risks=[{"severity": "high", "description": "Risk"}],
         risks_security_concerns=[],
@@ -120,7 +128,9 @@ async def test_get_analysis_success(async_client: AsyncClient, db_session: Async
 
 
 @pytest.mark.asyncio
-async def test_get_analysis_no_analysis(async_client: AsyncClient, db_session: AsyncSession):
+async def test_get_analysis_no_analysis(
+    async_client: AsyncClient, db_session: AsyncSession
+):
     """Test getting analysis when none exists."""
     # Generate a valid UUID for testing
     feature_id = str(uuid4())

@@ -353,7 +353,9 @@ class TestAnalysisModel:
         session.commit()
 
         # SQLite doesn't preserve timezone info, so compare without timezone
-        assert analysis.completed_at.replace(tzinfo=None) == completed.replace(tzinfo=None)
+        assert analysis.completed_at.replace(tzinfo=None) == completed.replace(
+            tzinfo=None
+        )
 
     def test_analysis_has_created_at_field(self, session):
         """Analysis should have a created_at timestamp field."""
@@ -513,7 +515,7 @@ class TestFeatureWebhookFields:
         )
         session.add(feature)
         session.commit()
-        
+
         retrieved = session.get(Feature, "test-123")
         assert retrieved.webhook_secret == "secret-abc-123"
 
@@ -526,7 +528,7 @@ class TestFeatureWebhookFields:
         )
         session.add(feature)
         session.commit()
-        
+
         retrieved = session.get(Feature, "test-123")
         assert retrieved.webhook_secret is None
 
@@ -547,7 +549,11 @@ class TestFeatureWebhookFields:
         # SQLite doesn't preserve timezone info, so compare without timezone
         # Use timedelta comparison to avoid microsecond precision issues
         now_naive = now.replace(tzinfo=None)
-        retrieved_naive = retrieved.webhook_received_at.replace(tzinfo=None) if retrieved.webhook_received_at.tzinfo else retrieved.webhook_received_at
+        retrieved_naive = (
+            retrieved.webhook_received_at.replace(tzinfo=None)
+            if retrieved.webhook_received_at.tzinfo
+            else retrieved.webhook_received_at
+        )
         assert abs((retrieved_naive - now_naive).total_seconds()) < 1
 
     def test_webhook_received_at_is_optional(self, session):
@@ -559,7 +565,7 @@ class TestFeatureWebhookFields:
         )
         session.add(feature)
         session.commit()
-        
+
         retrieved = session.get(Feature, "test-123")
         assert retrieved.webhook_received_at is None
 
@@ -579,7 +585,11 @@ class TestFeatureWebhookFields:
         assert retrieved.last_polled_at is not None
         # SQLite doesn't preserve timezone info, so compare without timezone
         now_naive = now.replace(tzinfo=None)
-        retrieved_naive = retrieved.last_polled_at.replace(tzinfo=None) if retrieved.last_polled_at.tzinfo else retrieved.last_polled_at
+        retrieved_naive = (
+            retrieved.last_polled_at.replace(tzinfo=None)
+            if retrieved.last_polled_at.tzinfo
+            else retrieved.last_polled_at
+        )
         assert abs((retrieved_naive - now_naive).total_seconds()) < 1
 
     def test_last_polled_at_is_optional(self, session):
@@ -591,6 +601,6 @@ class TestFeatureWebhookFields:
         )
         session.add(feature)
         session.commit()
-        
+
         retrieved = session.get(Feature, "test-123")
         assert retrieved.last_polled_at is None

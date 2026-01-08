@@ -86,9 +86,7 @@ class TestAnalysisResultWebhook:
                 "story_points": 8,
                 "estimated_hours": 24,
             },
-            "affected_modules": [
-                {"path": "src/api.py", "change_type": "new"}
-            ],
+            "affected_modules": [{"path": "src/api.py", "change_type": "new"}],
             "implementation_tasks": [
                 {
                     "id": "task-1",
@@ -96,9 +94,7 @@ class TestAnalysisResultWebhook:
                     "task_type": "prerequisite",
                 }
             ],
-            "technical_risks": [
-                {"category": "security", "severity": "medium"}
-            ],
+            "technical_risks": [{"category": "security", "severity": "medium"}],
             "recommendations": {
                 "approach": "Start with MVP",
                 "alternatives": ["Use existing framework"],

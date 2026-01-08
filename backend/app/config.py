@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     port: int = 8891
 
     # Database
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/product_analysis"
+    database_url: str = (
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/product_analysis"
+    )
 
     # GitHub
     github_token: str = "placeholder"

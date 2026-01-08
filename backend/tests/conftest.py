@@ -1,10 +1,8 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import event
 from sqlalchemy.pool import NullPool
 
-from app.main import app
 from app.database import get_db
 from app.models import Base
 
@@ -48,6 +46,16 @@ async def test_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
+
+
+@pytest.fixture
+async def db_session(test_db):
+    """Create a database session for tests."""
+    async with test_db() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
 
 
 @pytest.fixture

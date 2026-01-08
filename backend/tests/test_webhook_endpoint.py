@@ -9,7 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.main import app
 from app.database import get_db
 from app.models import Base, Feature, FeatureStatus
-from app.utils.webhook_security import compute_webhook_signature, generate_webhook_secret
+from app.utils.webhook_security import (
+    compute_webhook_signature,
+    generate_webhook_secret,
+)
 
 
 # Test database setup - SQLite in-memory with async
@@ -360,11 +363,12 @@ class TestWebhookEndpoint:
         # Verify Analysis record was created
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
-        from app.models import Analysis
 
         # Reload feature with analyses eagerly loaded
         result = await db_session.execute(
-            select(Feature).where(Feature.id == test_feature_with_webhook.id).options(selectinload(Feature.analyses))
+            select(Feature)
+            .where(Feature.id == test_feature_with_webhook.id)
+            .options(selectinload(Feature.analyses))
         )
         feature = result.scalar_one()
 
@@ -398,56 +402,133 @@ class TestWebhookEndpoint:
 
 
 @pytest.mark.asyncio
-async def test_webhook_saves_flattened_analysis(
+async def test_webhook_extracts_flattened_fields_from_real_workflow_structure(
     async_client: AsyncClient, db_session: AsyncSession
 ):
-    """Test webhook saves analysis in flattened format."""
+    """Should extract and populate all 13 flattened fields from REAL workflow structure.
+
+    This test uses the ACTUAL structure that the GitHub workflow generates,
+    NOT the incorrect structure with complexity.summary and complexity.implementation.
+    """
     from app.models.analysis import Analysis
     from sqlalchemy import select
 
     # Create feature
     feature = Feature(
-        id="webhook-test-flat",
-        name="Webhook Test Feature",
-        description="Testing flattened save",
+        id="webhook-real-structure",
+        name="Webhook Real Structure Test",
+        description="Testing with real workflow structure",
         status=FeatureStatus.ANALYZING,
-        webhook_secret="test-secret-flat",
+        webhook_secret="test-secret-real",
     )
     db_session.add(feature)
     await db_session.commit()
 
-    # Prepare webhook payload with nested structure
+    # Prepare webhook payload with REAL workflow structure
     payload = {
-        "feature_id": "webhook-test-flat",
-        "complexity": {
-            "summary": {
-                "overview": "This feature is complex",
-                "key_points": ["Point 1", "Point 2"],
-                "metrics": {"complexity": "high", "confidence": 0.9}
-            },
-            "implementation": {
-                "architecture": {"pattern": "Microservices"},
-                "technical_details": [{"category": "API"}],
-                "data_flow": {"steps": ["Step 1"]}
+        "feature_id": "webhook-real-structure",
+        "warnings": [
+            {
+                "type": "missing_infrastructure",
+                "severity": "high",
+                "message": "Backend infrastructure missing",
+                "impact": "Increases estimate significantly",
             }
+        ],
+        "repository_state": {
+            "has_backend_code": True,
+            "has_frontend_code": True,
+            "has_database_models": True,
+            "has_authentication": False,
+            "maturity_level": "partial",
+            "notes": "Core infrastructure exists but auth missing",
         },
-        "warnings": [],
-        "repository_state": {},
-        "affected_modules": [],
-        "implementation_tasks": [],
-        "technical_risks": [{"severity": "medium"}],
+        "complexity": {
+            "story_points": 13,
+            "estimated_hours": 24,
+            "prerequisite_hours": 16,
+            "total_hours": 40,
+            "level": "High",
+            "rationale": "Requires significant backend and frontend changes",
+        },
+        "affected_modules": [
+            {
+                "path": "backend/app/api/features.py",
+                "change_type": "modify",
+                "reason": "Add new endpoint",
+            },
+            {
+                "path": "frontend/src/components/FeatureForm.vue",
+                "change_type": "modify",
+                "reason": "Add UI for new feature",
+            },
+        ],
+        "implementation_tasks": [
+            {
+                "id": "task-1",
+                "task_type": "prerequisite",
+                "description": "Setup authentication system",
+                "estimated_effort_hours": 16,
+                "dependencies": [],
+                "priority": "high",
+            },
+            {
+                "id": "task-2",
+                "task_type": "feature",
+                "description": "Implement API endpoint",
+                "estimated_effort_hours": 12,
+                "dependencies": ["task-1"],
+                "priority": "high",
+            },
+            {
+                "id": "task-3",
+                "task_type": "feature",
+                "description": "Build frontend UI",
+                "estimated_effort_hours": 12,
+                "dependencies": ["task-2"],
+                "priority": "medium",
+            },
+        ],
+        "technical_risks": [
+            {
+                "category": "security",
+                "description": "Authentication bypass vulnerability",
+                "severity": "critical",
+                "mitigation": "Implement proper JWT validation with refresh tokens",
+            },
+            {
+                "category": "performance",
+                "description": "Database query N+1 problem",
+                "severity": "medium",
+                "mitigation": "Use eager loading with selectinload",
+            },
+            {
+                "category": "scalability",
+                "description": "High memory usage with large datasets",
+                "severity": "high",
+                "mitigation": "Implement pagination and streaming",
+            },
+        ],
         "recommendations": {
-            "improvements": [{"priority": "high"}],
-            "best_practices": ["Practice 1"],
-            "next_steps": ["Step 1"]
+            "approach": "Start with authentication infrastructure, then build feature incrementally",
+            "alternatives": [
+                "Use OAuth provider like Auth0",
+                "Implement custom JWT auth",
+            ],
+            "testing_strategy": "Unit tests for business logic, integration tests for API, E2E for critical flows",
+            "deployment_notes": "Requires database migration and environment variable updates",
         },
         "error": None,
-        "raw_output": "Raw output",
-        "metadata": {},
+        "raw_output": "Analysis completed successfully",
+        "metadata": {
+            "analyzed_at": "2024-01-15T10:00:00Z",
+            "workflow_run_id": "67890",
+            "model": "claude-3-5-sonnet-20241022",
+        },
     }
 
     payload_str = json.dumps(payload)
-    signature = compute_webhook_signature(payload_str, "test-secret-flat")
+    signature = compute_webhook_signature(payload_str, "test-secret-real")
 
     # Send webhook
     response = await async_client.post(
@@ -458,15 +539,72 @@ async def test_webhook_saves_flattened_analysis(
 
     assert response.status_code == 200
 
-    # Verify flattened data was saved
+    # Verify flattened data was extracted and saved
     result = await db_session.execute(
-        select(Analysis).where(Analysis.feature_id == "webhook-test-flat")
+        select(Analysis).where(Analysis.feature_id == "webhook-real-structure")
     )
     analysis = result.scalar_one()
 
-    assert analysis.summary_overview == "This feature is complex"
-    assert analysis.summary_key_points == ["Point 1", "Point 2"]
-    assert analysis.summary_metrics["complexity"] == "high"
-    assert analysis.implementation_architecture["pattern"] == "Microservices"
-    assert analysis.risks_technical_risks[0]["severity"] == "medium"
-    assert analysis.recommendations_improvements[0]["priority"] == "high"
+    # Verify flattened summary fields (from complexity)
+    assert analysis.summary_overview == "High"
+    assert analysis.summary_key_points == [
+        "Requires significant backend and frontend changes"
+    ]
+    assert analysis.summary_metrics == {
+        "story_points": 13,
+        "estimated_hours": 24,
+        "prerequisite_hours": 16,
+        "total_hours": 40,
+    }
+
+    # Verify flattened implementation fields (from implementation_tasks + affected_modules)
+    assert analysis.implementation_architecture == {
+        "affected_modules_count": 2,
+        "primary_areas": [
+            "backend/app/api/features.py",
+            "frontend/src/components/FeatureForm.vue",
+        ],
+    }
+    assert len(analysis.implementation_technical_details) == 3
+    assert analysis.implementation_technical_details[0]["id"] == "task-1"
+    assert analysis.implementation_technical_details[1]["id"] == "task-2"
+    assert analysis.implementation_technical_details[2]["id"] == "task-3"
+    assert analysis.implementation_data_flow == {
+        "has_prerequisites": True,
+        "prerequisite_count": 1,
+        "feature_task_count": 2,
+    }
+
+    # Verify flattened risk fields (from technical_risks)
+    assert len(analysis.risks_technical_risks) == 3
+    assert analysis.risks_technical_risks[0]["category"] == "security"
+
+    # Security concerns extracted from technical_risks
+    assert len(analysis.risks_security_concerns) == 1
+    assert analysis.risks_security_concerns[0]["severity"] == "critical"
+
+    # Scalability issues extracted from technical_risks
+    assert len(analysis.risks_scalability_issues) == 1
+    assert (
+        analysis.risks_scalability_issues[0]["description"]
+        == "High memory usage with large datasets"
+    )
+
+    # Mitigation strategies extracted from technical_risks
+    assert len(analysis.risks_mitigation_strategies) == 3
+    assert (
+        "Implement proper JWT validation with refresh tokens"
+        in analysis.risks_mitigation_strategies
+    )
+
+    # Verify flattened recommendation fields (from recommendations)
+    assert len(analysis.recommendations_improvements) == 2
+    assert "OAuth provider like Auth0" in analysis.recommendations_improvements[0]
+
+    assert len(analysis.recommendations_best_practices) >= 1
+    assert any(
+        "Unit tests" in practice for practice in analysis.recommendations_best_practices
+    )
+
+    assert len(analysis.recommendations_next_steps) >= 1
+    assert "Start with authentication" in analysis.recommendations_next_steps[0]

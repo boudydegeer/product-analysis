@@ -274,7 +274,9 @@ class TestFeatureResponse:
             updated_at=now,
             github_issue_url="https://github.com/org/repo/issues/1",
         )
-        assert response_with_url.github_issue_url == "https://github.com/org/repo/issues/1"
+        assert (
+            response_with_url.github_issue_url == "https://github.com/org/repo/issues/1"
+        )
 
     def test_has_analysis_workflow_run_id_optional(self):
         """FeatureResponse should have analysis_workflow_run_id as optional str."""

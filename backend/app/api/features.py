@@ -211,7 +211,9 @@ async def trigger_analysis(
         # Construct callback URL if webhook_base_url is configured
         callback_url = None
         if settings.webhook_base_url:
-            callback_url = f"{settings.webhook_base_url}/api/v1/webhooks/analysis-result"
+            callback_url = (
+                f"{settings.webhook_base_url}/api/v1/webhooks/analysis-result"
+            )
 
         # Trigger the analysis workflow with callback URL
         run_id = await github_service.trigger_analysis_workflow(
@@ -241,7 +243,10 @@ async def trigger_analysis(
         )
 
 
-@router.get("/{feature_id}/analysis", response_model=AnalysisDetailResponse | AnalysisErrorResponse)
+@router.get(
+    "/{feature_id}/analysis",
+    response_model=AnalysisDetailResponse | AnalysisErrorResponse,
+)
 async def get_feature_analysis(
     feature_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -259,8 +264,10 @@ async def get_feature_analysis(
         HTTPException: If feature not found
     """
     # Get feature
-    result = await db.execute(select(Feature).where(Feature.id == str(feature_id)))
-    feature = result.scalar_one_or_none()
+    feature_result = await db.execute(
+        select(Feature).where(Feature.id == str(feature_id))
+    )
+    feature = feature_result.scalar_one_or_none()
 
     if not feature:
         raise HTTPException(
@@ -269,13 +276,13 @@ async def get_feature_analysis(
         )
 
     # Get most recent analysis
-    result = await db.execute(
+    analysis_result = await db.execute(
         select(Analysis)
         .where(Analysis.feature_id == str(feature_id))
         .order_by(Analysis.created_at.desc())
         .limit(1)
     )
-    analysis = result.scalar_one_or_none()
+    analysis = analysis_result.scalar_one_or_none()
 
     # Handle no analysis case
     if not analysis:
@@ -300,34 +307,46 @@ async def get_feature_analysis(
             feature_id=str(feature_id),
             status="failed",
             message="Analysis failed",
-            failed_at=analysis.completed_at.isoformat() if analysis.completed_at else None,
+            failed_at=analysis.completed_at.isoformat()
+            if analysis.completed_at
+            else None,
         )
+
+    # Import schema classes for response construction
+    from app.schemas.analysis import (
+        AnalysisOverviewResponse,
+        AnalysisImplementationResponse,
+        AnalysisRisksResponse,
+        AnalysisRecommendationsResponse,
+    )
 
     # Return successful analysis
     return AnalysisDetailResponse(
         feature_id=str(feature_id),
         feature_name=feature.name,
-        analyzed_at=analysis.completed_at.isoformat() if analysis.completed_at else None,
+        analyzed_at=analysis.completed_at.isoformat()
+        if analysis.completed_at
+        else None,
         status="completed",
-        overview={
-            "summary": analysis.summary_overview or "",
-            "key_points": analysis.summary_key_points or [],
-            "metrics": analysis.summary_metrics or {},
-        },
-        implementation={
-            "architecture": analysis.implementation_architecture or {},
-            "technical_details": analysis.implementation_technical_details or [],
-            "data_flow": analysis.implementation_data_flow or {},
-        },
-        risks={
-            "technical_risks": analysis.risks_technical_risks or [],
-            "security_concerns": analysis.risks_security_concerns or [],
-            "scalability_issues": analysis.risks_scalability_issues or [],
-            "mitigation_strategies": analysis.risks_mitigation_strategies or [],
-        },
-        recommendations={
-            "improvements": analysis.recommendations_improvements or [],
-            "best_practices": analysis.recommendations_best_practices or [],
-            "next_steps": analysis.recommendations_next_steps or [],
-        },
+        overview=AnalysisOverviewResponse(
+            summary=analysis.summary_overview or "",
+            key_points=analysis.summary_key_points or [],
+            metrics=analysis.summary_metrics or {},
+        ),
+        implementation=AnalysisImplementationResponse(
+            architecture=analysis.implementation_architecture or {},
+            technical_details=analysis.implementation_technical_details or [],
+            data_flow=analysis.implementation_data_flow or {},
+        ),
+        risks=AnalysisRisksResponse(
+            technical_risks=analysis.risks_technical_risks or [],
+            security_concerns=analysis.risks_security_concerns or [],
+            scalability_issues=analysis.risks_scalability_issues or [],
+            mitigation_strategies=analysis.risks_mitigation_strategies or [],
+        ),
+        recommendations=AnalysisRecommendationsResponse(
+            improvements=analysis.recommendations_improvements or [],
+            best_practices=analysis.recommendations_best_practices or [],
+            next_steps=analysis.recommendations_next_steps or [],
+        ),
     )

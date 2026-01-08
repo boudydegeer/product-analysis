@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models import Feature, FeatureStatus, Analysis
 from app.services.github_service import GitHubService, GitHubServiceError
+from app.utils.analysis_mapper import extract_flattened_fields
 
 logger = logging.getLogger(__name__)
 
@@ -95,12 +96,16 @@ class AnalysisPollingService:
 
             if status == "completed":
                 # Download and process results
-                logger.info(f"Polling feature {feature.id}: downloading results and updating status")
+                logger.info(
+                    f"Polling feature {feature.id}: downloading results and updating status"
+                )
                 await self._process_completed_workflow(feature, run_id, github_service)
 
             elif status in ["failure", "cancelled", "timed_out"]:
                 # Mark feature as failed
-                logger.warning(f"Polling feature {feature.id}: workflow {status}, marking as FAILED")
+                logger.warning(
+                    f"Polling feature {feature.id}: workflow {status}, marking as FAILED"
+                )
                 feature.status = FeatureStatus.FAILED
 
                 # Create error analysis record
@@ -118,7 +123,9 @@ class AnalysisPollingService:
 
             elif status in ["queued", "in_progress"]:
                 # Still running, will check again next polling cycle
-                logger.debug(f"Polling feature {feature.id}: workflow still {status}, will check again later")
+                logger.debug(
+                    f"Polling feature {feature.id}: workflow still {status}, will check again later"
+                )
 
             await self.db.commit()
             await github_service.close()
@@ -128,7 +135,9 @@ class AnalysisPollingService:
             # Don't update feature status on transient errors
 
         except Exception as e:
-            logger.error(f"Polling feature {feature.id}: unexpected error - {e}", exc_info=True)
+            logger.error(
+                f"Polling feature {feature.id}: unexpected error - {e}", exc_info=True
+            )
 
     async def _process_completed_workflow(
         self, feature: Feature, run_id: int, github_service: GitHubService
@@ -143,13 +152,17 @@ class AnalysisPollingService:
         try:
             # Download artifact with feature-specific name
             artifact_name = f"feature-analysis-{feature.id}"
-            logger.debug(f"Polling feature {feature.id}: downloading artifact '{artifact_name}'")
+            logger.debug(
+                f"Polling feature {feature.id}: downloading artifact '{artifact_name}'"
+            )
 
             result_data = await github_service.download_workflow_artifact(
                 run_id, artifact_name=artifact_name
             )
 
-            logger.debug(f"Polling feature {feature.id}: artifact downloaded successfully")
+            logger.debug(
+                f"Polling feature {feature.id}: artifact downloaded successfully"
+            )
 
             # Check if analysis had errors
             has_error = "error" in result_data
@@ -162,7 +175,10 @@ class AnalysisPollingService:
                 f"Polling feature {feature.id}: updated status to {new_status.value}"
             )
 
-            # Create analysis record
+            # Extract flattened fields from result
+            flattened_fields = extract_flattened_fields(result_data)
+
+            # Create analysis record with flattened fields
             analysis = Analysis(
                 feature_id=feature.id,
                 result=result_data,
@@ -171,6 +187,8 @@ class AnalysisPollingService:
                     "model", "claude-3-5-sonnet-20241022"
                 ),
                 completed_at=datetime.now(UTC),
+                # Flattened fields
+                **flattened_fields,
             )
 
             self.db.add(analysis)
@@ -211,13 +229,18 @@ class AnalysisPollingService:
         if len(features) == 0:
             logger.info("Polling service: No features needing updates")
         else:
-            logger.info(f"Polling service: Found {len(features)} features needing updates")
+            logger.info(
+                f"Polling service: Found {len(features)} features needing updates"
+            )
 
         for feature in features:
             try:
                 await self.poll_workflow_status(feature)
             except Exception as e:
-                logger.error(f"Polling service: Error polling feature {feature.id} - {e}", exc_info=True)
+                logger.error(
+                    f"Polling service: Error polling feature {feature.id} - {e}",
+                    exc_info=True,
+                )
                 # Continue with other features
 
         return len(features)

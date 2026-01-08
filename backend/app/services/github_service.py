@@ -122,14 +122,14 @@ class GitHubService:
             ) from e
         except httpx.RequestError as e:
             logger.error(f"Request error triggering workflow: {e}")
-            raise GitHubServiceError(
-                f"Request error triggering workflow: {e}"
-            ) from e
+            raise GitHubServiceError(f"Request error triggering workflow: {e}") from e
 
         # GitHub dispatch returns 204 No Content on success
         # We need to get the run_id by listing recent workflow runs
         run_id = await self._get_latest_workflow_run_id()
-        logger.info(f"Triggered analysis workflow for feature {feature_id}, run_id={run_id}")
+        logger.info(
+            f"Triggered analysis workflow for feature {feature_id}, run_id={run_id}"
+        )
         return run_id
 
     async def _get_latest_workflow_run_id(self) -> int:
@@ -154,7 +154,7 @@ class GitHubService:
             if not data.get("workflow_runs"):
                 raise GitHubServiceError("No workflow runs found")
 
-            return data["workflow_runs"][0]["id"]
+            return int(data["workflow_runs"][0]["id"])
 
         except httpx.HTTPStatusError as e:
             logger.error(f"Failed to get workflow runs: {e}")
@@ -179,14 +179,14 @@ class GitHubService:
             response.raise_for_status()
             data = response.json()
 
-            status = data.get("status", "unknown")
+            status = str(data.get("status", "unknown"))
             conclusion = data.get("conclusion")
 
             # If completed, return the conclusion (success/failure)
             if status == "completed":
                 if conclusion == "success":
                     return "completed"
-                return conclusion or "failure"
+                return str(conclusion) if conclusion else "failure"
 
             return status
 
@@ -247,7 +247,9 @@ class GitHubService:
             artifact_id = target_artifact["id"]
             download_url = f"/repos/{self.owner}/{self.repo_name}/actions/artifacts/{artifact_id}/zip"
 
-            download_response = await self._client.get(download_url, follow_redirects=True)
+            download_response = await self._client.get(
+                download_url, follow_redirects=True
+            )
             download_response.raise_for_status()
 
             # Parse ZIP and extract JSON
@@ -281,7 +283,8 @@ class GitHubService:
 
                 # Read and parse the first JSON file
                 json_content = zf.read(json_files[0])
-                return json.loads(json_content)
+                result: dict[str, Any] = json.loads(json_content)
+                return result
 
         except zipfile.BadZipFile as e:
             raise GitHubServiceError(f"Invalid ZIP file in artifact: {e}") from e

@@ -43,10 +43,14 @@ class Feature(Base, TimestampMixin):
 
     # Webhook tracking
     webhook_secret: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    webhook_received_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    webhook_received_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Polling tracking
-    last_polled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_polled_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Relationships
     analyses: Mapped[list["Analysis"]] = relationship(

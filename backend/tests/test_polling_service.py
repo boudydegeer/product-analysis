@@ -300,6 +300,172 @@ class TestAnalysisPollingService:
         features = await polling_service.get_features_needing_polling()
 
         # Feature should be excluded because webhook was received very recently
-        feature_ids = [f.id for f in features]
         # The test passes if no exception is raised during the query
         assert True  # If we get here, the timezone handling works
+        assert len(features) == 0  # Feature should be excluded due to recent webhook
+
+    async def test_process_completed_workflow_extracts_flattened_fields(
+        self, polling_service, analyzing_feature, db_session: AsyncSession
+    ):
+        """Should extract and populate all 13 flattened fields from workflow result.
+
+        This test uses the REAL structure that the GitHub workflow generates.
+        """
+        # Mock workflow result with REAL structure
+        workflow_result = {
+            "feature_id": analyzing_feature.id,
+            "warnings": [
+                {
+                    "type": "missing_infrastructure",
+                    "severity": "high",
+                    "message": "Backend infrastructure missing",
+                    "impact": "Increases estimate significantly",
+                }
+            ],
+            "repository_state": {
+                "has_backend_code": True,
+                "has_frontend_code": True,
+                "has_database_models": True,
+                "has_authentication": False,
+                "maturity_level": "partial",
+                "notes": "Core infrastructure exists but auth missing",
+            },
+            "complexity": {
+                "story_points": 8,
+                "estimated_hours": 16,
+                "prerequisite_hours": 8,
+                "total_hours": 24,
+                "level": "Medium",
+                "rationale": "Requires new API endpoints and UI components",
+            },
+            "affected_modules": [
+                {
+                    "path": "backend/app/api/features.py",
+                    "change_type": "modify",
+                    "reason": "Add new endpoint",
+                }
+            ],
+            "implementation_tasks": [
+                {
+                    "id": "task-1",
+                    "task_type": "prerequisite",
+                    "description": "Setup authentication",
+                    "estimated_effort_hours": 8,
+                    "dependencies": [],
+                    "priority": "high",
+                },
+                {
+                    "id": "task-2",
+                    "task_type": "feature",
+                    "description": "Implement feature logic",
+                    "estimated_effort_hours": 16,
+                    "dependencies": ["task-1"],
+                    "priority": "high",
+                },
+            ],
+            "technical_risks": [
+                {
+                    "category": "security",
+                    "description": "Authentication bypass vulnerability",
+                    "severity": "high",
+                    "mitigation": "Implement proper JWT validation",
+                },
+                {
+                    "category": "performance",
+                    "description": "N+1 query problem",
+                    "severity": "medium",
+                    "mitigation": "Use eager loading",
+                },
+            ],
+            "recommendations": {
+                "approach": "Start with authentication, then feature implementation",
+                "alternatives": ["Use third-party auth service", "Implement OAuth"],
+                "testing_strategy": "Unit tests + integration tests",
+                "deployment_notes": "Requires database migration",
+            },
+            "metadata": {
+                "analyzed_at": "2024-01-15T10:00:00Z",
+                "workflow_run_id": "12345",
+                "model": "claude-3-5-sonnet-20241022",
+            },
+        }
+
+        mock_github_service = AsyncMock()
+        mock_github_service.get_workflow_run_status.return_value = "completed"
+        mock_github_service.download_workflow_artifact.return_value = workflow_result
+
+        with patch(
+            "app.services.polling_service.GitHubService",
+            return_value=mock_github_service,
+        ):
+            await polling_service.poll_workflow_status(analyzing_feature)
+
+        # Query the created Analysis record
+        from sqlalchemy import select
+        from app.models import Analysis
+
+        result = await db_session.execute(
+            select(Analysis).where(Analysis.feature_id == analyzing_feature.id)
+        )
+        analysis = result.scalar_one()
+
+        # Verify flattened summary fields are populated from complexity
+        assert analysis.summary_overview == "Medium"
+        assert analysis.summary_key_points == [
+            "Requires new API endpoints and UI components"
+        ]
+        assert analysis.summary_metrics == {
+            "story_points": 8,
+            "estimated_hours": 16,
+            "prerequisite_hours": 8,
+            "total_hours": 24,
+        }
+
+        # Verify flattened implementation fields from implementation_tasks
+        assert analysis.implementation_architecture == {
+            "affected_modules_count": 1,
+            "primary_areas": ["backend/app/api/features.py"],
+        }
+        assert len(analysis.implementation_technical_details) == 2
+        assert analysis.implementation_technical_details[0]["id"] == "task-1"
+        assert analysis.implementation_technical_details[1]["id"] == "task-2"
+        assert analysis.implementation_data_flow == {
+            "has_prerequisites": True,
+            "prerequisite_count": 1,
+            "feature_task_count": 1,
+        }
+
+        # Verify flattened risk fields from technical_risks
+        assert len(analysis.risks_technical_risks) == 2
+        assert analysis.risks_technical_risks[0]["category"] == "security"
+        assert analysis.risks_technical_risks[1]["category"] == "performance"
+
+        # Extract security and scalability concerns from technical_risks
+        assert len(analysis.risks_security_concerns) == 1
+        assert (
+            analysis.risks_security_concerns[0]["description"]
+            == "Authentication bypass vulnerability"
+        )
+
+        # No scalability risks in test data (only security and performance)
+        assert len(analysis.risks_scalability_issues) == 0
+
+        # Mitigation strategies extracted from technical_risks
+        assert len(analysis.risks_mitigation_strategies) == 2
+        assert "Implement proper JWT validation" in analysis.risks_mitigation_strategies
+        assert "Use eager loading" in analysis.risks_mitigation_strategies
+
+        # Verify flattened recommendation fields from recommendations
+        assert len(analysis.recommendations_improvements) == 2
+        assert any(
+            "third-party auth" in str(imp).lower()
+            for imp in analysis.recommendations_improvements
+        )
+
+        assert len(analysis.recommendations_best_practices) >= 1
+        assert (
+            "Unit tests + integration tests" in analysis.recommendations_best_practices
+        )
+
+        assert len(analysis.recommendations_next_steps) >= 1
+        assert "Start with authentication" in analysis.recommendations_next_steps[0]

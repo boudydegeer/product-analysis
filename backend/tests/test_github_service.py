@@ -97,7 +97,9 @@ class TestTriggerAnalysisWorkflow:
             mock_client.post.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_trigger_analysis_workflow_failure_raises_exception(self, github_service):
+    async def test_trigger_analysis_workflow_failure_raises_exception(
+        self, github_service
+    ):
         """Failed workflow trigger should raise GitHubServiceError."""
         feature_id = UUID("12345678-1234-5678-1234-567812345678")
 

@@ -1,6 +1,4 @@
 """Tests for webhook security utilities."""
-import pytest
-import secrets
 
 from app.utils.webhook_security import (
     generate_webhook_secret,

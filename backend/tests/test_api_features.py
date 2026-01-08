@@ -6,7 +6,7 @@ Uses SQLite in-memory database with aiosqlite for async operations.
 
 import pytest
 from typing import AsyncGenerator
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from httpx import AsyncClient, ASGITransport
@@ -441,7 +441,9 @@ class TestTriggerAnalysis:
 
         try:
             non_existent_id = str(uuid4())
-            response = await async_client.post(f"/api/v1/features/{non_existent_id}/analyze")
+            response = await async_client.post(
+                f"/api/v1/features/{non_existent_id}/analyze"
+            )
 
             assert response.status_code == 404
         finally:
@@ -476,7 +478,9 @@ class TestTriggerAnalysis:
 
             # Verify workflow run_id was stored
             get_response = await async_client.get(f"/api/v1/features/{feature_id}")
-            assert get_response.json()["analysis_workflow_run_id"] == str(expected_run_id)
+            assert get_response.json()["analysis_workflow_run_id"] == str(
+                expected_run_id
+            )
         finally:
             # Clean up dependency override
             if get_github_service in app.dependency_overrides:
@@ -546,7 +550,9 @@ class TestFeatureCreationWithWebhook:
         # But it should exist in database
         from sqlalchemy import select
 
-        result = await db_session.execute(select(Feature).where(Feature.id == data["id"]))
+        result = await db_session.execute(
+            select(Feature).where(Feature.id == data["id"])
+        )
         feature = result.scalar_one()
 
         assert feature.webhook_secret is not None
@@ -630,9 +636,7 @@ class TestTriggerAnalysisWithCallback:
 
         try:
             async with AsyncClient(app=app, base_url="http://test") as client:
-                response = await client.post(
-                    f"/api/v1/features/{feature_id}/analyze"
-                )
+                response = await client.post(f"/api/v1/features/{feature_id}/analyze")
 
             assert response.status_code == 202
 
@@ -682,9 +686,7 @@ class TestTriggerAnalysisWithCallback:
 
         try:
             async with AsyncClient(app=app, base_url="http://test") as client:
-                response = await client.post(
-                    f"/api/v1/features/{feature_id}/analyze"
-                )
+                response = await client.post(f"/api/v1/features/{feature_id}/analyze")
 
             assert response.status_code == 202
 

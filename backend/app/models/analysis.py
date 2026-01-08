@@ -30,28 +30,52 @@ class Analysis(Base, TimestampMixin):
     # Flattened summary fields
     summary_overview: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     summary_key_points: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
-    summary_metrics: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    summary_metrics: Mapped[Optional[dict[str, Any]]] = mapped_column(
+        JSON, nullable=True
+    )
 
     # Flattened implementation fields
-    implementation_architecture: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
-    implementation_technical_details: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSON, nullable=True)
-    implementation_data_flow: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    implementation_architecture: Mapped[Optional[dict[str, Any]]] = mapped_column(
+        JSON, nullable=True
+    )
+    implementation_technical_details: Mapped[
+        Optional[list[dict[str, Any]]]
+    ] = mapped_column(JSON, nullable=True)
+    implementation_data_flow: Mapped[Optional[dict[str, Any]]] = mapped_column(
+        JSON, nullable=True
+    )
 
     # Flattened risk fields
-    risks_technical_risks: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSON, nullable=True)
-    risks_security_concerns: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSON, nullable=True)
-    risks_scalability_issues: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSON, nullable=True)
-    risks_mitigation_strategies: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
+    risks_technical_risks: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
+        JSON, nullable=True
+    )
+    risks_security_concerns: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
+        JSON, nullable=True
+    )
+    risks_scalability_issues: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
+        JSON, nullable=True
+    )
+    risks_mitigation_strategies: Mapped[Optional[list[str]]] = mapped_column(
+        JSON, nullable=True
+    )
 
     # Flattened recommendation fields
-    recommendations_improvements: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSON, nullable=True)
-    recommendations_best_practices: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
-    recommendations_next_steps: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
+    recommendations_improvements: Mapped[
+        Optional[list[dict[str, Any]]]
+    ] = mapped_column(JSON, nullable=True)
+    recommendations_best_practices: Mapped[Optional[list[str]]] = mapped_column(
+        JSON, nullable=True
+    )
+    recommendations_next_steps: Mapped[Optional[list[str]]] = mapped_column(
+        JSON, nullable=True
+    )
 
     # Metadata
     tokens_used: Mapped[int] = mapped_column(Integer, nullable=False)
     model_used: Mapped[str] = mapped_column(String(100), nullable=False)
-    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Relationships
     feature: Mapped["Feature"] = relationship("Feature", back_populates="analyses")

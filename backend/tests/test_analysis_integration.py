@@ -87,24 +87,20 @@ async def test_full_analysis_flow(async_client: AsyncClient, db_session: AsyncSe
             "summary": {
                 "overview": "Test flow overview",
                 "key_points": ["Flow point 1"],
-                "metrics": {"complexity": "low"}
+                "metrics": {"complexity": "low"},
             },
             "implementation": {
                 "architecture": {"pattern": "Flow pattern"},
                 "technical_details": [],
-                "data_flow": {}
-            }
+                "data_flow": {},
+            },
         },
         "warnings": [],
         "repository_state": {},
         "affected_modules": [],
         "implementation_tasks": [],
         "technical_risks": [],
-        "recommendations": {
-            "improvements": [],
-            "best_practices": [],
-            "next_steps": []
-        },
+        "recommendations": {"improvements": [], "best_practices": [], "next_steps": []},
         "error": None,
         "raw_output": "",
         "metadata": {},
@@ -121,7 +117,9 @@ async def test_full_analysis_flow(async_client: AsyncClient, db_session: AsyncSe
     assert webhook_response.status_code == 200
 
     # 3. Fetch analysis via endpoint
-    analysis_response = await async_client.get(f"/api/v1/features/{feature_id}/analysis")
+    analysis_response = await async_client.get(
+        f"/api/v1/features/{feature_id}/analysis"
+    )
     assert analysis_response.status_code == 200
 
     data = analysis_response.json()

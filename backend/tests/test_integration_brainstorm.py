@@ -1,11 +1,10 @@
 """Integration tests for brainstorm feature."""
 import pytest
-from uuid import uuid4
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models.brainstorm import BrainstormSession, BrainstormMessage, MessageRole
+from app.models.brainstorm import BrainstormSession
 
 
 class TestBrainstormIntegration:

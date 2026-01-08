@@ -410,8 +410,13 @@ class TestAnalysisPollingService:
         analysis = result.scalar_one()
 
         # Verify flattened summary fields are populated from complexity
-        assert analysis.summary_overview == "Requires new API endpoints and UI components"
-        assert "Requires new API endpoints and UI components" in analysis.summary_key_points
+        assert (
+            analysis.summary_overview == "Requires new API endpoints and UI components"
+        )
+        assert (
+            "Requires new API endpoints and UI components"
+            in analysis.summary_key_points
+        )
         assert "⚠️ Backend infrastructure missing" in analysis.summary_key_points
         assert analysis.summary_metrics["complexity"] == "medium"
         assert analysis.summary_metrics["story_points"] == 8
@@ -419,7 +424,9 @@ class TestAnalysisPollingService:
 
         # Verify flattened implementation fields from implementation_tasks
         assert analysis.implementation_architecture["affected_modules_count"] == 1
-        assert analysis.implementation_architecture["primary_areas"] == ["backend/app/api/features.py"]
+        assert analysis.implementation_architecture["primary_areas"] == [
+            "backend/app/api/features.py"
+        ]
         assert "pattern" in analysis.implementation_architecture
         assert "components" in analysis.implementation_architecture
         assert len(analysis.implementation_technical_details) == 2

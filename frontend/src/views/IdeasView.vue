@@ -74,6 +74,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useIdeasStore } from '@/stores/ideas'
+import type { IdeaPriority } from '@/types/idea'
 import IdeaList from '@/components/IdeaList.vue'
 import {
   Dialog,
@@ -101,7 +102,11 @@ const store = useIdeasStore()
 
 const showCreateDialog = ref(false)
 const evaluateAfterCreate = ref(true)
-const formData = ref({
+const formData = ref<{
+  title: string
+  description: string
+  priority: IdeaPriority
+}>({
   title: '',
   description: '',
   priority: 'medium',

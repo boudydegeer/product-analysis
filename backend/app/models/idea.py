@@ -1,5 +1,4 @@
 """Idea model for product ideas management."""
-from datetime import datetime
 import enum
 from typing import TYPE_CHECKING
 

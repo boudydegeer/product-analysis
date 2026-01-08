@@ -57,7 +57,9 @@ class IdeaEvaluationRequest(BaseModel):
 class IdeaEvaluationResponse(BaseModel):
     """Schema for AI evaluation response."""
 
-    business_value: int = Field(..., ge=1, le=10, description="Business value score (1-10)")
+    business_value: int = Field(
+        ..., ge=1, le=10, description="Business value score (1-10)"
+    )
     technical_complexity: int = Field(
         ..., ge=1, le=10, description="Technical complexity score (1-10)"
     )

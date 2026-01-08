@@ -17,7 +17,7 @@ class TestIdeaEvaluationService:
         description = "Add dark mode support to the application"
 
         # Mock the Anthropic client
-        with patch.object(service, 'client') as mock_client:
+        with patch.object(service, "client") as mock_client:
             mock_response = MagicMock()
             mock_response.content = [
                 MagicMock(
@@ -47,7 +47,7 @@ class TestIdeaEvaluationService:
         """Test parsing result with markdown code block."""
         service = IdeaEvaluationService(api_key="test-key")
 
-        text = '''Here's my evaluation:
+        text = """Here's my evaluation:
 
 ```json
 {
@@ -59,7 +59,7 @@ class TestIdeaEvaluationService:
 }
 ```
 
-This looks like a good idea!'''
+This looks like a good idea!"""
 
         result = service._parse_evaluation_result(text)
 

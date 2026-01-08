@@ -3,7 +3,7 @@ import { mount, VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import IdeaList from '../IdeaList.vue'
 import { useIdeasStore } from '@/stores/ideas'
-import type { Idea } from '@/types/ideas'
+import type { Idea } from '@/types/idea'
 
 // Mock lucide-vue-next icons
 vi.mock('lucide-vue-next', () => ({
@@ -64,7 +64,11 @@ describe('IdeaList', () => {
       description: 'Description 1',
       status: 'backlog',
       priority: 'high',
-      created_by: 'user1',
+      business_value: null,
+      technical_complexity: null,
+      estimated_effort: null,
+      market_fit_analysis: null,
+      risk_assessment: null,
       created_at: '2026-01-08T10:00:00Z',
       updated_at: '2026-01-08T10:00:00Z',
     },
@@ -74,7 +78,11 @@ describe('IdeaList', () => {
       description: 'Description 2',
       status: 'approved',
       priority: 'medium',
-      created_by: 'user2',
+      business_value: null,
+      technical_complexity: null,
+      estimated_effort: null,
+      market_fit_analysis: null,
+      risk_assessment: null,
       created_at: '2026-01-08T11:00:00Z',
       updated_at: '2026-01-08T11:00:00Z',
     },
@@ -84,7 +92,11 @@ describe('IdeaList', () => {
       description: 'Description 3',
       status: 'backlog',
       priority: 'low',
-      created_by: 'user3',
+      business_value: null,
+      technical_complexity: null,
+      estimated_effort: null,
+      market_fit_analysis: null,
+      risk_assessment: null,
       created_at: '2026-01-08T12:00:00Z',
       updated_at: '2026-01-08T12:00:00Z',
     },

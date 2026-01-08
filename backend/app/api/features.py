@@ -14,7 +14,11 @@ from app.config import settings
 from app.database import get_db
 from app.models import Feature, FeatureStatus, Analysis
 from app.schemas import FeatureCreate, FeatureUpdate, FeatureResponse
-from app.schemas.analysis import AnalysisDetailResponse, AnalysisErrorResponse
+from app.schemas.analysis import (
+    AnalysisDetailResponse,
+    AnalysisErrorResponse,
+    ImprovementItem,
+)
 from app.services.github_service import GitHubService
 from app.utils.webhook_security import generate_webhook_secret
 
@@ -345,7 +349,10 @@ async def get_feature_analysis(
             mitigation_strategies=analysis.risks_mitigation_strategies or [],
         ),
         recommendations=AnalysisRecommendationsResponse(
-            improvements=analysis.recommendations_improvements or [],
+            improvements=[
+                ImprovementItem(**item)
+                for item in (analysis.recommendations_improvements or [])
+            ],
             best_practices=analysis.recommendations_best_practices or [],
             next_steps=analysis.recommendations_next_steps or [],
         ),

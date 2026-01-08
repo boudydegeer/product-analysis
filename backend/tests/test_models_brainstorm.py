@@ -4,7 +4,13 @@ from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models import Base, BrainstormSession, BrainstormMessage, BrainstormSessionStatus, MessageRole
+from app.models import (
+    Base,
+    BrainstormSession,
+    BrainstormMessage,
+    BrainstormSessionStatus,
+    MessageRole,
+)
 
 
 @pytest.fixture

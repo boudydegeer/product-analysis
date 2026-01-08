@@ -4,7 +4,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from unittest.mock import patch, AsyncMock
 
-from app.models.brainstorm import BrainstormSession, BrainstormMessage, MessageRole
+from app.models.brainstorm import BrainstormSession, MessageRole
 
 
 class TestStreamBrainstorm:
@@ -29,16 +29,14 @@ class TestStreamBrainstorm:
             yield "Hello "
             yield "world"
 
-        with patch(
-            "app.api.brainstorms.BrainstormingService"
-        ) as MockService:
+        with patch("app.api.brainstorms.BrainstormingService") as MockService:
             mock_instance = MockService.return_value
             mock_instance.__aenter__.return_value = mock_instance
             mock_instance.__aexit__.return_value = AsyncMock()
             mock_instance.stream_brainstorm_message = mock_stream
 
             response = await async_client.get(
-                f"/api/v1/brainstorms/session-1/stream",
+                "/api/v1/brainstorms/session-1/stream",
                 params={"message": "Hello Claude"},
             )
 
@@ -61,16 +59,14 @@ class TestStreamBrainstorm:
         async def mock_stream(*args, **kwargs):
             yield "Response text"
 
-        with patch(
-            "app.api.brainstorms.BrainstormingService"
-        ) as MockService:
+        with patch("app.api.brainstorms.BrainstormingService") as MockService:
             mock_instance = MockService.return_value
             mock_instance.__aenter__.return_value = mock_instance
             mock_instance.__aexit__.return_value = AsyncMock()
             mock_instance.stream_brainstorm_message = mock_stream
 
             await async_client.get(
-                f"/api/v1/brainstorms/session-2/stream",
+                "/api/v1/brainstorms/session-2/stream",
                 params={"message": "User message"},
             )
 

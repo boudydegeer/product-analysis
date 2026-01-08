@@ -41,7 +41,7 @@
                 id="feature-description"
                 v-model="newFeature.description"
                 placeholder="Detailed feature description"
-                rows="4"
+                :rows="4"
                 required
               />
             </div>

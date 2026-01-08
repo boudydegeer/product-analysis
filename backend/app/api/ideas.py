@@ -37,7 +37,9 @@ async def create_idea(
         title=idea_in.title,
         description=idea_in.description,
         status=IdeaStatus.BACKLOG,
-        priority=IdeaPriority(idea_in.priority) if idea_in.priority else IdeaPriority.MEDIUM,
+        priority=IdeaPriority(idea_in.priority)
+        if idea_in.priority
+        else IdeaPriority.MEDIUM,
     )
 
     db.add(idea)
@@ -53,7 +55,10 @@ async def create_idea(
 async def list_ideas(
     skip: int = 0,
     limit: int = 100,
-    status: str | None = Query(None, pattern="^(backlog|under_review|approved|rejected|implemented)$"),
+    status: str
+    | None = Query(
+        None, pattern="^(backlog|under_review|approved|rejected|implemented)$"
+    ),
     priority: str | None = Query(None, pattern="^(low|medium|high|critical)$"),
     db: AsyncSession = Depends(get_db),
 ) -> list[Idea]:

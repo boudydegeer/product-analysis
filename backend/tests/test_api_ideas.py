@@ -1,6 +1,5 @@
 """Tests for ideas API endpoints."""
 import pytest
-from uuid import uuid4
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 

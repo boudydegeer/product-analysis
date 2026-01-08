@@ -1,9 +1,8 @@
 """Brainstorm session and message models."""
-from datetime import datetime
 import enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Text, DateTime, ForeignKey, func
+from sqlalchemy import String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Enum as SQLEnum
 
@@ -59,11 +58,11 @@ class BrainstormMessage(Base, TimestampMixin):
 
     id: Mapped[str] = mapped_column(String(50), primary_key=True)
     session_id: Mapped[str] = mapped_column(
-        String(50), ForeignKey("brainstorm_sessions.id", ondelete="CASCADE"), nullable=False
+        String(50),
+        ForeignKey("brainstorm_sessions.id", ondelete="CASCADE"),
+        nullable=False,
     )
-    role: Mapped[MessageRole] = mapped_column(
-        SQLEnum(MessageRole), nullable=False
-    )
+    role: Mapped[MessageRole] = mapped_column(SQLEnum(MessageRole), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
     # Relationships

@@ -45,12 +45,16 @@ def extract_flattened_fields(result_data: Dict[str, Any]) -> Dict[str, Any]:
         summary_key_points.append(f"📊 {repo_state['notes']}")
 
     # Build metrics in format expected by frontend
-    total_hours = complexity.get("total_hours", 0) or complexity.get("estimated_hours", 0)
+    total_hours = complexity.get("total_hours", 0) or complexity.get(
+        "estimated_hours", 0
+    )
     estimated_days = round(total_hours / 8, 1) if total_hours else 0
 
     summary_metrics = {
         "complexity": complexity.get("level", "Unknown").lower(),  # low, medium, high
-        "estimated_effort": f"{estimated_days} days" if estimated_days >= 1 else f"{total_hours} hours",
+        "estimated_effort": f"{estimated_days} days"
+        if estimated_days >= 1
+        else f"{total_hours} hours",
         "confidence": 0.85,  # Default confidence, can be enhanced later
         "story_points": complexity.get("story_points"),
         "estimated_hours": total_hours,
@@ -74,11 +78,20 @@ def extract_flattened_fields(result_data: Dict[str, Any]) -> Dict[str, Any]:
         path = mod.get("path", "")
         if "models" in path.lower() or "schema" in path.lower():
             components.add("Data models")
-        if "api" in path.lower() or "routes" in path.lower() or "endpoints" in path.lower():
+        if (
+            "api" in path.lower()
+            or "routes" in path.lower()
+            or "endpoints" in path.lower()
+        ):
             components.add("API endpoints")
         if "services" in path.lower():
             components.add("Business logic services")
-        if "components" in path.lower() or ".vue" in path or ".jsx" in path or ".tsx" in path:
+        if (
+            "components" in path.lower()
+            or ".vue" in path
+            or ".jsx" in path
+            or ".tsx" in path
+        ):
             components.add("UI components")
         if "utils" in path.lower() or "helpers" in path.lower():
             components.add("Utility functions")
@@ -118,15 +131,21 @@ def extract_flattened_fields(result_data: Dict[str, Any]) -> Dict[str, Any]:
 
     if prerequisite_count > 0:
         data_flow_description = f"Implementation requires {prerequisite_count} prerequisite task(s) before {feature_task_count} feature-specific task(s)."
-        data_flow_steps.append(f"Complete {prerequisite_count} prerequisite tasks (infrastructure, setup)")
+        data_flow_steps.append(
+            f"Complete {prerequisite_count} prerequisite tasks (infrastructure, setup)"
+        )
         data_flow_steps.append(f"Implement {feature_task_count} feature-specific tasks")
     else:
-        data_flow_description = f"Direct implementation with {feature_task_count} task(s)."
+        data_flow_description = (
+            f"Direct implementation with {feature_task_count} task(s)."
+        )
         data_flow_steps.append(f"Implement {feature_task_count} tasks")
 
     # Add affected module information to data flow
     if len(affected_modules) > 0:
-        data_flow_steps.append(f"Modify {len(affected_modules)} module(s): {', '.join(primary_areas[:3])}")
+        data_flow_steps.append(
+            f"Modify {len(affected_modules)} module(s): {', '.join(primary_areas[:3])}"
+        )
 
     implementation_data_flow = {
         "description": data_flow_description,

@@ -4,6 +4,7 @@ import json
 import re
 from typing import Any
 from anthropic import AsyncAnthropic
+from anthropic.types import TextBlock
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,10 @@ Description: {description}"""
             )
 
             # Parse response
-            response_text = response.content[0].text
+            first_block = response.content[0]
+            if not isinstance(first_block, TextBlock):
+                raise ValueError("Expected TextBlock in response")
+            response_text = first_block.text
             result = self._parse_evaluation_result(response_text)
 
             logger.info(f"Successfully evaluated idea: {title}")
@@ -137,7 +141,7 @@ Description: {description}"""
             if not (1 <= result["technical_complexity"] <= 10):
                 raise ValueError("technical_complexity must be 1-10")
 
-            return result
+            return dict(result)
 
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {e}")

@@ -21,7 +21,7 @@ class MockEventSource {
   }
 }
 
-global.EventSource = MockEventSource as any
+;(globalThis as any).EventSource = MockEventSource
 
 describe('Brainstorms API', () => {
   beforeEach(() => {

@@ -546,8 +546,13 @@ async def test_webhook_extracts_flattened_fields_from_real_workflow_structure(
     analysis = result.scalar_one()
 
     # Verify flattened summary fields (from complexity)
-    assert analysis.summary_overview == "Requires significant backend and frontend changes"
-    assert "Requires significant backend and frontend changes" in analysis.summary_key_points
+    assert (
+        analysis.summary_overview == "Requires significant backend and frontend changes"
+    )
+    assert (
+        "Requires significant backend and frontend changes"
+        in analysis.summary_key_points
+    )
     assert "⚠️ Backend infrastructure missing" in analysis.summary_key_points
     assert analysis.summary_metrics["complexity"] == "high"
     assert analysis.summary_metrics["story_points"] == 13
@@ -555,8 +560,14 @@ async def test_webhook_extracts_flattened_fields_from_real_workflow_structure(
 
     # Verify flattened implementation fields (from implementation_tasks + affected_modules)
     assert analysis.implementation_architecture["affected_modules_count"] == 2
-    assert "backend/app/api/features.py" in analysis.implementation_architecture["primary_areas"]
-    assert "frontend/src/components/FeatureForm.vue" in analysis.implementation_architecture["primary_areas"]
+    assert (
+        "backend/app/api/features.py"
+        in analysis.implementation_architecture["primary_areas"]
+    )
+    assert (
+        "frontend/src/components/FeatureForm.vue"
+        in analysis.implementation_architecture["primary_areas"]
+    )
     assert "pattern" in analysis.implementation_architecture
     assert "components" in analysis.implementation_architecture
     assert len(analysis.implementation_technical_details) == 3
@@ -593,7 +604,10 @@ async def test_webhook_extracts_flattened_fields_from_real_workflow_structure(
 
     # Verify flattened recommendation fields (from recommendations)
     assert len(analysis.recommendations_improvements) == 2
-    assert "OAuth provider like Auth0" in analysis.recommendations_improvements[0]
+    assert (
+        "OAuth provider like Auth0"
+        in analysis.recommendations_improvements[0]["description"]
+    )
 
     assert len(analysis.recommendations_best_practices) >= 1
     assert any(

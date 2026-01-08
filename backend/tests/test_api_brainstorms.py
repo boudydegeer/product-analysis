@@ -1,10 +1,9 @@
 """Tests for brainstorm API endpoints."""
 import pytest
-from uuid import uuid4
-from httpx import AsyncClient, ASGITransport
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.brainstorm import BrainstormSession, BrainstormSessionStatus
+from app.models.brainstorm import BrainstormSession
 
 
 class TestCreateBrainstormSession:

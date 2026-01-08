@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.models.brainstorm import BrainstormSession, BrainstormSessionStatus, BrainstormMessage, MessageRole
+from app.models.brainstorm import (
+    BrainstormSession,
+    BrainstormSessionStatus,
+    BrainstormMessage,
+    MessageRole,
+)
 from app.schemas.brainstorm import (
     BrainstormSessionCreate,
     BrainstormSessionUpdate,
@@ -242,8 +247,7 @@ async def stream_brainstorm(
 
     # Build conversation history
     messages = [
-        {"role": msg.role.value, "content": msg.content}
-        for msg in session.messages
+        {"role": msg.role.value, "content": msg.content} for msg in session.messages
     ]
     messages.append({"role": "user", "content": message})
 

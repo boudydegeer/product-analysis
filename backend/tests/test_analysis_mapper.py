@@ -1,5 +1,4 @@
 """Tests for analysis mapper utility."""
-import pytest
 from app.utils.analysis_mapper import extract_flattened_fields
 
 
@@ -32,9 +31,21 @@ def test_extract_flattened_fields_complete_workflow():
             "notes": "Backend and frontend exist but missing DB models",
         },
         "affected_modules": [
-            {"path": "/backend/app/models/user.py", "change_type": "new", "reason": "Create user model"},
-            {"path": "/backend/app/api/users.py", "change_type": "modify", "reason": "Add user endpoints"},
-            {"path": "/frontend/src/components/UserList.vue", "change_type": "new", "reason": "User list UI"},
+            {
+                "path": "/backend/app/models/user.py",
+                "change_type": "new",
+                "reason": "Create user model",
+            },
+            {
+                "path": "/backend/app/api/users.py",
+                "change_type": "modify",
+                "reason": "Add user endpoints",
+            },
+            {
+                "path": "/frontend/src/components/UserList.vue",
+                "change_type": "new",
+                "reason": "User list UI",
+            },
         ],
         "implementation_tasks": [
             {
@@ -90,9 +101,14 @@ def test_extract_flattened_fields_complete_workflow():
 
     # Verify summary fields
     assert fields["summary_overview"] == "Complex feature requiring multiple components"
-    assert "Complex feature requiring multiple components" in fields["summary_key_points"]
+    assert (
+        "Complex feature requiring multiple components" in fields["summary_key_points"]
+    )
     assert "⚠️ Database models not found" in fields["summary_key_points"]
-    assert "📊 Backend and frontend exist but missing DB models" in fields["summary_key_points"]
+    assert (
+        "📊 Backend and frontend exist but missing DB models"
+        in fields["summary_key_points"]
+    )
 
     # Verify metrics
     assert fields["summary_metrics"]["complexity"] == "high"
@@ -112,7 +128,10 @@ def test_extract_flattened_fields_complete_workflow():
     # Verify technical details
     assert len(fields["implementation_technical_details"]) == 3
     assert fields["implementation_technical_details"][0]["category"] == "task-1"
-    assert "database models" in fields["implementation_technical_details"][0]["description"].lower()
+    assert (
+        "database models"
+        in fields["implementation_technical_details"][0]["description"].lower()
+    )
 
     # Verify data flow
     assert "description" in fields["implementation_data_flow"]
@@ -130,7 +149,9 @@ def test_extract_flattened_fields_complete_workflow():
     # Verify recommendations
     assert len(fields["recommendations_improvements"]) == 1
     assert fields["recommendations_improvements"][0]["priority"] == "high"
-    assert fields["recommendations_improvements"][0]["title"] == "Add password validation"
+    assert (
+        fields["recommendations_improvements"][0]["title"] == "Add password validation"
+    )
     assert len(fields["recommendations_best_practices"]) == 1
     assert len(fields["recommendations_next_steps"]) == 1
 

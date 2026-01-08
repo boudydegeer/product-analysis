@@ -1,32 +1,36 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
-import { useVModel } from '@vueuse/core'
-import { cn } from '@/lib/utils'
-
 interface Props {
-  class?: HTMLAttributes['class']
-  defaultValue?: string | number
-  modelValue?: string | number
+  modelValue?: string
+  placeholder?: string
+  rows?: number
+  disabled?: boolean
+  class?: string
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  rows: 3,
+})
 
-const emits = defineEmits<{
-  (e: 'update:modelValue', payload: string | number): void
+const emit = defineEmits<{
+  'update:modelValue': [value: string]
 }>()
 
-const modelValue = useVModel(props, 'modelValue', emits, {
-  passive: true,
-  defaultValue: props.defaultValue,
-})
+const handleInput = (event: Event) => {
+  const target = event.target as HTMLTextAreaElement
+  emit('update:modelValue', target.value)
+}
 </script>
 
 <template>
   <textarea
-    v-model="modelValue"
-    :class="cn(
-      'flex min-h-[80px] w-full rounded-md border border-input bg-background text-foreground px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+    :value="modelValue"
+    :placeholder="placeholder"
+    :rows="rows"
+    :disabled="disabled"
+    :class="[
+      'flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
       props.class,
-    )"
+    ]"
+    @input="handleInput"
   />
 </template>

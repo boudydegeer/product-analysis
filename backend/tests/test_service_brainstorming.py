@@ -1,6 +1,6 @@
 """Tests for brainstorming service."""
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 from app.services.brainstorming_service import BrainstormingService
 
 
@@ -17,7 +17,7 @@ class TestBrainstormingService:
         ]
 
         # Mock the Anthropic client
-        with patch.object(service, 'client') as mock_client:
+        with patch.object(service, "client") as mock_client:
             # Create an async iterator that yields text chunks
             async def mock_text_stream():
                 for text in ["Key ", "features ", "include..."]:
@@ -25,7 +25,9 @@ class TestBrainstormingService:
 
             mock_stream = MagicMock()
             mock_stream.text_stream = mock_text_stream()
-            mock_client.messages.stream.return_value.__aenter__.return_value = mock_stream
+            mock_client.messages.stream.return_value.__aenter__.return_value = (
+                mock_stream
+            )
 
             chunks = []
             async for chunk in service.stream_brainstorm_message(messages):

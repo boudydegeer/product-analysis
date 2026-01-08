@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from app.schemas.idea import (
     IdeaCreate,
-    IdeaUpdate,
     IdeaResponse,
     IdeaEvaluationRequest,
     IdeaEvaluationResponse,

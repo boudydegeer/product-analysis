@@ -5,19 +5,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import get_db
 from app.models import Base
+
 # Import all models to ensure they're registered with Base metadata
-from app.models import (
-    Feature,
-    FeatureStatus,
-    Analysis,
-    BrainstormSession,
-    BrainstormMessage,
-    BrainstormSessionStatus,
-    MessageRole,
-    Idea,
-    IdeaStatus,
-    IdeaPriority,
-)
 
 
 # Test database URL

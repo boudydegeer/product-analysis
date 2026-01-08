@@ -2,6 +2,7 @@
 import logging
 from typing import AsyncGenerator, Any
 from anthropic import AsyncAnthropic
+from anthropic.types import MessageParam
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ You have access to WebSearch and WebFetch tools for research."""
         self.model = model
         self.client = AsyncAnthropic(api_key=api_key)
 
-    def _format_messages(self, messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    def _format_messages(self, messages: list[dict[str, str]]) -> list[MessageParam]:
         """Format messages for Claude API.
 
         Args:
@@ -49,7 +50,7 @@ You have access to WebSearch and WebFetch tools for research."""
             Formatted messages
         """
         return [
-            {"role": msg["role"], "content": msg["content"]}
+            MessageParam(role=msg["role"], content=msg["content"])  # type: ignore[typeddict-item]
             for msg in messages
         ]
 

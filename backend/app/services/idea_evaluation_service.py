@@ -52,6 +52,13 @@ Be objective, concise, and data-driven in your analysis."""
             system_prompt=self.SYSTEM_PROMPT,
         )
         self.client = ClaudeSDKClient(options=options)
+        self.connected = False
+
+    async def _ensure_connected(self):
+        """Ensure client is connected."""
+        if not self.connected:
+            await self.client.connect()
+            self.connected = True
 
     async def evaluate_idea(
         self, title: str, description: str, context: str | None = None
@@ -70,6 +77,9 @@ Be objective, concise, and data-driven in your analysis."""
             Exception: If evaluation fails
         """
         try:
+            # Ensure client is connected
+            await self._ensure_connected()
+
             # Build prompt
             prompt = f"""Evaluate this product idea:
 
@@ -82,20 +92,28 @@ Description: {description}"""
 
             prompt += "\n\nProvide your evaluation as JSON."
 
-            # Call Claude Agent (non-streaming)
+            # Send query
+            await self.client.query(prompt)
+
+            # Receive and accumulate response
             response_text = ""
-            async for event in self.client.stream_query(prompt):
-                # Accumulate the response
-                if hasattr(event, 'content') and isinstance(event.content, str):
-                    response_text += event.content
-                elif hasattr(event, 'text') and isinstance(event.text, str):
-                    response_text += event.text
-                elif isinstance(event, dict) and 'content' in event:
-                    response_text += event['content']
-                elif isinstance(event, dict) and 'text' in event:
-                    response_text += event['text']
-                elif isinstance(event, str):
-                    response_text += event
+            async for message in self.client.receive_messages():
+                # Extract text from different message types
+                if hasattr(message, 'content'):
+                    if isinstance(message.content, str):
+                        response_text += message.content
+                    elif isinstance(message.content, list):
+                        # Handle content blocks
+                        for block in message.content:
+                            if hasattr(block, 'text'):
+                                response_text += block.text
+                            elif isinstance(block, dict) and 'text' in block:
+                                response_text += block['text']
+                elif hasattr(message, 'text'):
+                    response_text += message.text
+                elif hasattr(message, 'delta') and hasattr(message.delta, 'text'):
+                    # Stream event with delta
+                    response_text += message.delta.text
 
             # Parse response
             result = self._parse_evaluation_result(response_text)
@@ -162,8 +180,9 @@ Description: {description}"""
 
     async def close(self) -> None:
         """Close the service and cleanup resources."""
-        # Agent SDK handles cleanup automatically
-        pass
+        if self.connected:
+            await self.client.disconnect()
+            self.connected = False
 
     async def __aenter__(self) -> "IdeaEvaluationService":
         """Async context manager entry."""

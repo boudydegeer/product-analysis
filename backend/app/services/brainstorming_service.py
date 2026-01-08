@@ -49,6 +49,13 @@ You have access to WebSearch and WebFetch tools for research."""
             system_prompt=self.SYSTEM_PROMPT,
         )
         self.client = ClaudeSDKClient(options=options)
+        self.connected = False
+
+    async def _ensure_connected(self):
+        """Ensure client is connected."""
+        if not self.connected:
+            await self.client.connect()
+            self.connected = True
 
     async def stream_brainstorm_message(
         self, messages: list[dict[str, str]]
@@ -62,6 +69,9 @@ You have access to WebSearch and WebFetch tools for research."""
             Text chunks from Claude's response
         """
         try:
+            # Ensure client is connected
+            await self._ensure_connected()
+
             # Build the prompt from the conversation history
             prompt_parts = []
             for msg in messages:
@@ -74,19 +84,27 @@ You have access to WebSearch and WebFetch tools for research."""
 
             prompt = "\n\n".join(prompt_parts)
 
-            # Stream response from agent
-            async for event in self.client.stream_query(prompt):
-                # Extract text from different event types
-                if hasattr(event, 'content') and isinstance(event.content, str):
-                    yield event.content
-                elif hasattr(event, 'text') and isinstance(event.text, str):
-                    yield event.text
-                elif isinstance(event, dict) and 'content' in event:
-                    yield event['content']
-                elif isinstance(event, dict) and 'text' in event:
-                    yield event['text']
-                elif isinstance(event, str):
-                    yield event
+            # Send query (non-blocking)
+            await self.client.query(prompt)
+
+            # Receive messages in streaming mode
+            async for message in self.client.receive_messages():
+                # Extract text from different message types
+                if hasattr(message, 'content'):
+                    if isinstance(message.content, str):
+                        yield message.content
+                    elif isinstance(message.content, list):
+                        # Handle content blocks
+                        for block in message.content:
+                            if hasattr(block, 'text'):
+                                yield block.text
+                            elif isinstance(block, dict) and 'text' in block:
+                                yield block['text']
+                elif hasattr(message, 'text'):
+                    yield message.text
+                elif hasattr(message, 'delta') and hasattr(message.delta, 'text'):
+                    # Stream event with delta
+                    yield message.delta.text
 
         except Exception as e:
             logger.error(f"Error streaming brainstorm message: {e}")
@@ -94,8 +112,9 @@ You have access to WebSearch and WebFetch tools for research."""
 
     async def close(self) -> None:
         """Close the service and cleanup resources."""
-        # Agent SDK handles cleanup automatically
-        pass
+        if self.connected:
+            await self.client.disconnect()
+            self.connected = False
 
     async def __aenter__(self) -> "BrainstormingService":
         """Async context manager entry."""

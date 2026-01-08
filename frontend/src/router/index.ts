@@ -33,6 +33,18 @@ const routes: RouteRecordRaw[] = [
         name: 'settings',
         component: SettingsView,
         meta: { title: 'Settings' }
+      },
+      {
+        path: 'brainstorm',
+        name: 'brainstorm-list',
+        component: () => import('@/views/BrainstormListView.vue'),
+        meta: { title: 'Brainstorming' },
+      },
+      {
+        path: 'brainstorm/:id',
+        name: 'brainstorm-detail',
+        component: () => import('@/views/BrainstormDetailView.vue'),
+        meta: { title: 'Brainstorming Session' },
       }
     ]
   }

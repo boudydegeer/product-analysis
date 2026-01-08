@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AnalysisRisks } from '@/types/analysis'
+import MarkdownRenderer from '@/components/shared/MarkdownRenderer.vue'
 
 defineProps<{
   risks: AnalysisRisks
@@ -28,11 +29,17 @@ const getSeverityColor = (severity: string) => {
               {{ risk.severity }}
             </span>
             <div class="flex-1">
-              <p class="text-base mb-2">{{ risk.description }}</p>
-              <p v-if="risk.impact" class="text-sm text-muted-foreground">Impact: {{ risk.impact }}</p>
-              <p v-if="risk.recommendation" class="text-sm text-muted-foreground mt-1">
-                Recommendation: {{ risk.recommendation }}
-              </p>
+              <div class="mb-2">
+                <MarkdownRenderer :content="risk.description" />
+              </div>
+              <div v-if="risk.impact" class="text-sm mb-1">
+                <span class="text-muted-foreground">Impact:</span>
+                <MarkdownRenderer :content="risk.impact" />
+              </div>
+              <div v-if="risk.recommendation" class="text-sm mt-1">
+                <span class="text-muted-foreground">Recommendation:</span>
+                <MarkdownRenderer :content="risk.recommendation" />
+              </div>
             </div>
           </div>
         </div>
@@ -49,12 +56,18 @@ const getSeverityColor = (severity: string) => {
               {{ concern.severity }}
             </span>
             <div class="flex-1">
-              <p class="text-base mb-2">{{ concern.description }}</p>
+              <div class="mb-2">
+                <MarkdownRenderer :content="concern.description" />
+              </div>
               <div v-if="concern.cwe" class="text-sm text-muted-foreground">CWE: {{ concern.cwe }}</div>
-              <p v-if="concern.impact" class="text-sm text-muted-foreground">Impact: {{ concern.impact }}</p>
-              <p v-if="concern.recommendation" class="text-sm text-muted-foreground mt-1">
-                Recommendation: {{ concern.recommendation }}
-              </p>
+              <div v-if="concern.impact" class="text-sm mb-1">
+                <span class="text-muted-foreground">Impact:</span>
+                <MarkdownRenderer :content="concern.impact" />
+              </div>
+              <div v-if="concern.recommendation" class="text-sm mt-1">
+                <span class="text-muted-foreground">Recommendation:</span>
+                <MarkdownRenderer :content="concern.recommendation" />
+              </div>
             </div>
           </div>
         </div>
@@ -71,11 +84,17 @@ const getSeverityColor = (severity: string) => {
               {{ issue.severity }}
             </span>
             <div class="flex-1">
-              <p class="text-base mb-2">{{ issue.description }}</p>
-              <p v-if="issue.impact" class="text-sm text-muted-foreground">Impact: {{ issue.impact }}</p>
-              <p v-if="issue.recommendation" class="text-sm text-muted-foreground mt-1">
-                Recommendation: {{ issue.recommendation }}
-              </p>
+              <div class="mb-2">
+                <MarkdownRenderer :content="issue.description" />
+              </div>
+              <div v-if="issue.impact" class="text-sm mb-1">
+                <span class="text-muted-foreground">Impact:</span>
+                <MarkdownRenderer :content="issue.impact" />
+              </div>
+              <div v-if="issue.recommendation" class="text-sm mt-1">
+                <span class="text-muted-foreground">Recommendation:</span>
+                <MarkdownRenderer :content="issue.recommendation" />
+              </div>
             </div>
           </div>
         </div>

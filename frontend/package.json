@@ -12,11 +12,14 @@
     "screenshot": "node scripts/screenshot.js"
   },
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.19",
+    "@types/markdown-it": "^14.1.2",
     "@vueuse/core": "^14.1.0",
     "axios": "^1.13.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-vue-next": "^0.562.0",
+    "markdown-it": "^14.1.0",
     "pinia": "^3.0.4",
     "radix-vue": "^1.9.17",
     "reka-ui": "^2.7.0",

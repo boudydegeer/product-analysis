@@ -27,6 +27,37 @@ jobs:
         with:
           fetch-depth: 0  # Full history for better context
 
+      - name: Remove ignored files and directories
+        run: |
+          echo "Removing directories that should be ignored from analysis..."
+
+          # Python artifacts
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
+          rm -rf backend/.venv 2>/dev/null || true
+          rm -rf backend/build 2>/dev/null || true
+          rm -rf backend/dist 2>/dev/null || true
+
+          # Node.js artifacts
+          rm -rf node_modules 2>/dev/null || true
+          rm -rf frontend/node_modules 2>/dev/null || true
+          rm -rf frontend/dist 2>/dev/null || true
+
+          # IDE and system files
+          rm -rf .idea 2>/dev/null || true
+          find . -name ".DS_Store" -delete 2>/dev/null || true
+
+          # Git directory (not needed for analysis)
+          rm -rf .git 2>/dev/null || true
+
+          # Test artifacts
+          rm -rf feature-analysis-TEST-001 2>/dev/null || true
+
+          echo "Cleanup complete. Remaining structure:"
+          du -sh * 2>/dev/null | head -20
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -251,12 +282,27 @@ jobs:
                - Explain how missing infrastructure affects the estimate
                - Use appropriate severity levels (critical, high, medium, low)
 
-            4. OUTPUT REQUIREMENTS:
+            4. MARKDOWN FORMATTING (Required):
+               When generating text descriptions in any field, use Markdown formatting:
+               - Use **bold** for emphasis on key terms (e.g., **HIGH** complexity, **WARNING**)
+               - Use `code` for technical terms, file paths, and code references (e.g., `backend/app/models.py`)
+               - Use bullet lists (- item) for lists of items
+               - Use numbered lists (1. item) for sequential steps
+               - Use ## Headings for sections within long descriptions
+               - Use > blockquotes for warnings or important notes
+               - Use --- for horizontal rules to separate sections
+               - Always escape newlines as \n\n for paragraph breaks
+
+               Example formatted text:
+               "This is a **HIGH** complexity task because:\n\n## Prerequisites\n1. User model setup (`backend/models/user.py`) - 3h\n2. JWT infrastructure (`backend/auth/jwt.py`) - 4h\n\n> **Warning:** No authentication system currently exists\n\n**Impact:** This adds significant development time"
+
+            5. OUTPUT REQUIREMENTS:
                - Provide structured JSON response
                - Include repository_state assessment
                - Calculate both prerequisite_hours and feature-specific estimated_hours
                - Tag tasks as "prerequisite" or "feature" type
                - Order tasks logically (all prerequisites before feature tasks)
+               - Apply Markdown formatting to ALL descriptive text fields
           USER_PROMPT_TEMPLATE: |
             Analyze the following feature request for implementation planning.
 
@@ -264,13 +310,15 @@ jobs:
             Feature Description:
             {{FEATURE_CONTENT}}
 
+            IMPORTANT: Use Markdown formatting in ALL descriptive text fields (rationale, descriptions, messages, etc.).
+
             Please provide your analysis in the following structured response format:
 
             1. COMPLEXITY ESTIMATION:
                - Estimated story points (1, 2, 3, 5, 8, 13, 21)
                - Estimated implementation time (hours)
                - Complexity level (Low, Medium, High, Very High)
-               - Rationale for the estimation
+               - Rationale for the estimation (use Markdown formatting)
 
             2. AFFECTED MODULES/FILES:
                - List all modules or components that would need changes
@@ -280,7 +328,7 @@ jobs:
                - If infrastructure is missing, include PREREQUISITE tasks first (platform setup, auth, db, etc.)
                - Then include tasks specific to this feature
                - Break down into specific, actionable tasks
-               - Each task should have: description, estimated effort, dependencies, priority, and task_type
+               - Each task should have: description (use Markdown), estimated effort, dependencies, priority, and task_type
                - Use task_type: "prerequisite" for infrastructure work, "feature" for the actual feature
                - Order tasks logically with all prerequisites before feature tasks
 
@@ -290,12 +338,14 @@ jobs:
                - Performance implications
                - Breaking changes or backward compatibility issues
                - External dependencies or API changes needed
+               - All description fields must use Markdown formatting
 
             5. RECOMMENDATIONS:
-               - Priority improvements (structured with priority, title, description, effort)
+               - Priority improvements (structured with priority, title, description in Markdown, effort)
                - Alternative solutions to consider
                - Testing strategy
                - Deployment considerations
+               - All description fields must use Markdown formatting
 
             Please provide your response in valid JSON format with the following structure:
             {
@@ -304,8 +354,8 @@ jobs:
                 {
                   "type": "missing_infrastructure|estimation_uncertainty|prerequisite_required|other",
                   "severity": "critical|high|medium|low",
-                  "message": "string - clear explanation of the warning",
-                  "impact": "string - how this affects the estimate or implementation"
+                  "message": "string - clear explanation using Markdown formatting",
+                  "impact": "string - how this affects the estimate (use Markdown)"
                 }
               ],
               "repository_state": {
@@ -322,7 +372,7 @@ jobs:
                 "prerequisite_hours": number,
                 "total_hours": number,
                 "level": "Low|Medium|High|Very High",
-                "rationale": "string"
+                "rationale": "string - use Markdown formatting with **bold**, `code`, lists, etc."
               },
               "affected_modules": [
                 {
@@ -335,7 +385,7 @@ jobs:
                 {
                   "id": "string",
                   "task_type": "prerequisite|feature",
-                  "description": "string",
+                  "description": "string - use Markdown formatting",
                   "estimated_effort_hours": number,
                   "dependencies": ["string"],
                   "priority": "high|medium|low"
@@ -344,9 +394,9 @@ jobs:
               "technical_risks": [
                 {
                   "category": "security|performance|compatibility|dependencies|other",
-                  "description": "string",
+                  "description": "string - use Markdown formatting",
                   "severity": "low|medium|high|critical",
-                  "mitigation": "string"
+                  "mitigation": "string - use Markdown formatting"
                 }
               ],
               "recommendations": {
@@ -354,7 +404,7 @@ jobs:
                   {
                     "priority": "high|medium|low",
                     "title": "string - short title (max 60 chars)",
-                    "description": "string - detailed explanation of why and how",
+                    "description": "string - detailed explanation using Markdown formatting",
                     "effort": "string - estimated time (e.g., '1-2 days', '1 week')"
                   }
                 ],

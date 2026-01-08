@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AnalysisOverview } from '@/types/analysis'
+import MarkdownRenderer from '@/components/shared/MarkdownRenderer.vue'
 
 defineProps<{
   overview: AnalysisOverview
@@ -11,7 +12,7 @@ defineProps<{
     <!-- Summary Section -->
     <div class="space-y-2">
       <h3 class="text-lg font-semibold">Summary</h3>
-      <p class="text-muted-foreground">{{ overview.summary }}</p>
+      <MarkdownRenderer :content="overview.summary" />
     </div>
 
     <!-- Key Points Section -->

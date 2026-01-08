@@ -7,6 +7,7 @@ import CardHeader from '@/components/ui/card-header.vue'
 import CardTitle from '@/components/ui/card-title.vue'
 import CardContent from '@/components/ui/card-content.vue'
 import Badge from '@/components/ui/badge.vue'
+import MarkdownRenderer from '@/components/shared/MarkdownRenderer.vue'
 
 const props = defineProps<{
   recommendations: AnalysisRecommendations
@@ -51,7 +52,7 @@ const priorityColor = (priority: Improvement['priority']) => {
             </div>
           </CardHeader>
           <CardContent class="space-y-2">
-            <p class="text-muted-foreground">{{ improvement.description }}</p>
+            <MarkdownRenderer :content="improvement.description" />
             <div v-if="improvement.effort" class="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock class="w-4 h-4" />
               <span>Estimated effort: {{ improvement.effort }}</span>

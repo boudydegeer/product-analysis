@@ -1,6 +1,6 @@
 """Tests for brainstorming service."""
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from app.services.brainstorming_service import BrainstormingService
 
 
@@ -16,37 +16,44 @@ class TestBrainstormingService:
             {"role": "user", "content": "What are key features of a mobile app?"}
         ]
 
-        # Mock the Anthropic client
-        with patch.object(service, "client") as mock_client:
-            # Create an async iterator that yields text chunks
-            async def mock_text_stream():
-                for text in ["Key ", "features ", "include..."]:
-                    yield text
+        # Create message objects with delta.text attribute
+        class MockDelta:
+            def __init__(self, text):
+                self.text = text
 
-            mock_stream = MagicMock()
-            mock_stream.text_stream = mock_text_stream()
-            mock_client.messages.stream.return_value.__aenter__.return_value = (
-                mock_stream
-            )
+        class MockMessage:
+            def __init__(self, text):
+                self.delta = MockDelta(text)
+                # Don't have content or text attributes
+                self._content = None
+                self._text = None
 
-            chunks = []
-            async for chunk in service.stream_brainstorm_message(messages):
-                chunks.append(chunk)
+        # Create async iterator for receive_messages()
+        async def mock_receive_messages():
+            # Yield message objects with delta.text attribute (streaming mode)
+            for text in ["Key ", "features ", "include..."]:
+                yield MockMessage(text)
 
-            assert len(chunks) == 3
-            assert chunks[0] == "Key "
-            assert chunks[1] == "features "
+        # Mock the claude-agent-sdk client methods
+        mock_connect = AsyncMock()
+        mock_query = AsyncMock()
 
-    def test_format_messages(self):
-        """Test message formatting."""
-        service = BrainstormingService(api_key="test-key")
+        with patch.object(service.client, "connect", mock_connect):
+            with patch.object(service.client, "query", mock_query):
+                with patch.object(
+                    service.client,
+                    "receive_messages",
+                    MagicMock(return_value=mock_receive_messages())
+                ):
+                    chunks = []
+                    async for chunk in service.stream_brainstorm_message(messages):
+                        chunks.append(chunk)
 
-        messages = [
-            {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Hi there"},
-        ]
+                    assert len(chunks) == 3
+                    assert chunks[0] == "Key "
+                    assert chunks[1] == "features "
+                    assert chunks[2] == "include..."
 
-        formatted = service._format_messages(messages)
-        assert len(formatted) == 2
-        assert formatted[0]["role"] == "user"
-        assert formatted[0]["content"] == "Hello"
+                    # Verify client methods were called
+                    mock_connect.assert_awaited_once()
+                    mock_query.assert_awaited_once()

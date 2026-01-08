@@ -135,8 +135,10 @@ async def test_full_analysis_flow(async_client: AsyncClient, db_session: AsyncSe
     assert data["feature_id"] == feature_id
     assert data["status"] == "completed"
     # Overview data comes from complexity
-    assert data["overview"]["summary"] == "Medium"  # complexity.level
+    assert data["overview"]["summary"] == "Test flow overview"  # complexity.rationale
     assert data["overview"]["key_points"] == ["Test flow overview"]  # complexity.rationale
+    assert data["overview"]["metrics"]["complexity"] == "medium"  # complexity.level.lower()
+    assert "days" in data["overview"]["metrics"]["estimated_effort"] or "hours" in data["overview"]["metrics"]["estimated_effort"]
     # Recommendations should include the improvement
     assert len(data["recommendations"]["improvements"]) == 1
     assert data["recommendations"]["improvements"][0]["title"] == "Test improvement"

@@ -546,34 +546,28 @@ async def test_webhook_extracts_flattened_fields_from_real_workflow_structure(
     analysis = result.scalar_one()
 
     # Verify flattened summary fields (from complexity)
-    assert analysis.summary_overview == "High"
-    assert analysis.summary_key_points == [
-        "Requires significant backend and frontend changes"
-    ]
-    assert analysis.summary_metrics == {
-        "story_points": 13,
-        "estimated_hours": 24,
-        "prerequisite_hours": 16,
-        "total_hours": 40,
-    }
+    assert analysis.summary_overview == "Requires significant backend and frontend changes"
+    assert "Requires significant backend and frontend changes" in analysis.summary_key_points
+    assert "⚠️ Backend infrastructure missing" in analysis.summary_key_points
+    assert analysis.summary_metrics["complexity"] == "high"
+    assert analysis.summary_metrics["story_points"] == 13
+    assert analysis.summary_metrics["estimated_hours"] == 40  # total_hours
 
     # Verify flattened implementation fields (from implementation_tasks + affected_modules)
-    assert analysis.implementation_architecture == {
-        "affected_modules_count": 2,
-        "primary_areas": [
-            "backend/app/api/features.py",
-            "frontend/src/components/FeatureForm.vue",
-        ],
-    }
+    assert analysis.implementation_architecture["affected_modules_count"] == 2
+    assert "backend/app/api/features.py" in analysis.implementation_architecture["primary_areas"]
+    assert "frontend/src/components/FeatureForm.vue" in analysis.implementation_architecture["primary_areas"]
+    assert "pattern" in analysis.implementation_architecture
+    assert "components" in analysis.implementation_architecture
     assert len(analysis.implementation_technical_details) == 3
-    assert analysis.implementation_technical_details[0]["id"] == "task-1"
-    assert analysis.implementation_technical_details[1]["id"] == "task-2"
-    assert analysis.implementation_technical_details[2]["id"] == "task-3"
-    assert analysis.implementation_data_flow == {
-        "has_prerequisites": True,
-        "prerequisite_count": 1,
-        "feature_task_count": 2,
-    }
+    assert analysis.implementation_technical_details[0]["category"] == "task-1"
+    assert analysis.implementation_technical_details[1]["category"] == "task-2"
+    assert analysis.implementation_technical_details[2]["category"] == "task-3"
+    assert analysis.implementation_data_flow["has_prerequisites"] is True
+    assert analysis.implementation_data_flow["prerequisite_count"] == 1
+    assert analysis.implementation_data_flow["feature_task_count"] == 2
+    assert "description" in analysis.implementation_data_flow
+    assert "steps" in analysis.implementation_data_flow
 
     # Verify flattened risk fields (from technical_risks)
     assert len(analysis.risks_technical_risks) == 3

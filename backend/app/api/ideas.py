@@ -8,6 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.idea import Idea, IdeaStatus, IdeaPriority
 from app.schemas.idea import IdeaCreate, IdeaUpdate, IdeaResponse
+from app.config import settings
+from app.services.idea_evaluation_service import IdeaEvaluationService
+from app.schemas.idea import IdeaEvaluationRequest, IdeaEvaluationResponse
 
 logger = logging.getLogger(__name__)
 
@@ -179,3 +182,45 @@ async def delete_idea(
     await db.commit()
 
     logger.info(f"Deleted idea: {idea_id}")
+
+
+@router.post("/evaluate", response_model=IdeaEvaluationResponse)
+async def evaluate_idea(
+    evaluation_request: IdeaEvaluationRequest,
+) -> IdeaEvaluationResponse:
+    """Evaluate an idea with AI.
+
+    Args:
+        evaluation_request: Idea details for evaluation
+
+    Returns:
+        AI evaluation result
+
+    Raises:
+        HTTPException: If API key not configured or evaluation fails
+    """
+    if not settings.anthropic_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Anthropic API key not configured",
+        )
+
+    try:
+        async with IdeaEvaluationService(
+            api_key=settings.anthropic_api_key
+        ) as evaluation_service:
+            result = await evaluation_service.evaluate_idea(
+                title=evaluation_request.title,
+                description=evaluation_request.description,
+                context=evaluation_request.context,
+            )
+
+        logger.info(f"Evaluated idea: {evaluation_request.title}")
+        return IdeaEvaluationResponse(**result)
+
+    except Exception as e:
+        logger.error(f"Error evaluating idea: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to evaluate idea: {str(e)}",
+        )

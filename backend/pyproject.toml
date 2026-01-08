@@ -20,6 +20,7 @@ PyGithub = "^2.1.1"
 httpx = "^0.26.0"
 greenlet = "^3.3.0"
 apscheduler = "^3.11.2"
+anthropic = "^0.75.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.4"

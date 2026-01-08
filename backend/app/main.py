@@ -7,6 +7,7 @@ from app.config import settings
 from app.api.features import router as features_router
 from app.api.webhooks import router as webhooks_router
 from app.api.brainstorms import router as brainstorms_router
+from app.api.ideas import router as ideas_router
 from app.tasks.polling_task import start_polling_scheduler, stop_polling_scheduler
 
 
@@ -42,6 +43,7 @@ app.add_middleware(
 app.include_router(features_router)
 app.include_router(webhooks_router)
 app.include_router(brainstorms_router)
+app.include_router(ideas_router)
 
 
 @app.get("/")

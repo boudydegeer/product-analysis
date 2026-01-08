@@ -15,6 +15,13 @@ from app.schemas.brainstorm import (
     BrainstormMessageCreate,
     BrainstormMessageResponse,
 )
+from app.schemas.idea import (
+    IdeaCreate,
+    IdeaUpdate,
+    IdeaResponse,
+    IdeaEvaluationRequest,
+    IdeaEvaluationResponse,
+)
 
 __all__ = [
     "FeatureBase",
@@ -28,4 +35,9 @@ __all__ = [
     "BrainstormSessionResponse",
     "BrainstormMessageCreate",
     "BrainstormMessageResponse",
+    "IdeaCreate",
+    "IdeaUpdate",
+    "IdeaResponse",
+    "IdeaEvaluationRequest",
+    "IdeaEvaluationResponse",
 ]

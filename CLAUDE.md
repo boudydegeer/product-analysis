@@ -263,7 +263,9 @@ See `/docs/QUALITY_WORKFLOW.md` for complete documentation.
 
 ### Plan Status Management (Automatic)
 
-ALL implementation work must be tracked in `/docs/plans/index.md`. Claude automatically updates plan status at these workflow stages:
+ALL implementation work must be tracked in `/docs/plans/index.md`. Claude automatically updates plan status at these workflow stages.
+
+**Note**: The `update-plan-status` and `sync-plan-status` skills are located in `.claude/skills/` and are part of this project's repository.
 
 **Automatic Updates:**
 
@@ -296,6 +298,18 @@ ALL implementation work must be tracked in `/docs/plans/index.md`. Claude automa
 ```bash
 ./scripts/archive-plan.sh <filename>  # Archive completed plans to docs/plans/archived/
 ```
+
+**Verification Tools:**
+
+```bash
+# Auto-fix obvious issues, report problems
+./scripts/verify-plan-status.sh
+
+# Claude analyzes code and syncs statuses (requires confirmation)
+/sync-plan-status
+```
+
+Use verification weekly or when index.md seems out of sync with reality.
 
 **Status Lifecycle:** Backlog → Ready → In Progress → For Review → Done (or Blocked at any stage)
 

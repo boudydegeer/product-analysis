@@ -1,0 +1,81 @@
+name: update-plan-status
+description: Update plan status in docs/plans/index.md - use when starting, completing, or blocking implementation of a plan
+user_invocable: false  # This is called automatically by Claude, not by user
+
+prompt: |
+  You are managing the plan status tracking system for this project.
+
+  # Task
+
+  Update the status of plans in `/docs/plans/index.md` using the helper script.
+
+  # When to Use This Skill
+
+  This skill should be automatically used in these situations:
+
+  1. **After /brainstorming** - When a design is created:
+     - Register new plan with status "backlog"
+     - Use: `node scripts/update-plan-status.js --register --file=YYYY-MM-DD-plan-name.md --title="Plan Title" --description="Brief description" --status=backlog`
+
+  2. **After /writing-plans** - When an implementation plan is written:
+     - Update plan status to "ready"
+     - Use: `node scripts/update-plan-status.js --update --file=YYYY-MM-DD-plan-name.md --status=ready --note="Implementation plan completed"`
+
+  3. **When starting implementation** - When first todo is marked as "in_progress":
+     - Update plan status to "in-progress"
+     - Use: `node scripts/update-plan-status.js --update --file=YYYY-MM-DD-plan-name.md --status=in-progress --note="Started implementation"`
+
+  4. **When implementation completes** - When ALL todos of a plan are completed:
+     - Update plan status to "done"
+     - Use: `node scripts/update-plan-status.js --update --file=YYYY-MM-DD-plan-name.md --status=done --note="Implementation completed and verified"`
+
+  5. **When blocked** - When implementation is blocked:
+     - Update plan status to "blocked"
+     - Use: `node scripts/update-plan-status.js --update --file=YYYY-MM-DD-plan-name.md --status=blocked --note="Reason for blocking"`
+
+  6. **Manual update** - When user explicitly asks to update a plan status:
+     - Update to requested status
+     - Use appropriate command based on request
+
+  # Plan Status Lifecycle
+
+  ```
+  Backlog (🔴) → Design created via /brainstorming
+      ↓
+  Ready (🟣) → Plan written via /writing-plans
+      ↓
+  In Progress (🟡) → Implementation started
+      ↓
+  For Review (🟢) → Implementation done, needs review (optional)
+      ↓
+  Done (✅) → Completed and verified
+
+  Blocked (⚫) → Can happen at any stage
+  ```
+
+  # Instructions
+
+  1. Identify which plan document needs updating (look in docs/plans/ directory)
+  2. Determine the current status and target status
+  3. Use the helper script to update the status
+  4. Verify the update was successful
+  5. Report back what was changed
+
+  # Important Notes
+
+  - Always use absolute paths or ensure you're in the project root
+  - Plan filenames follow format: YYYY-MM-DD-descriptive-name.md
+  - The script automatically updates statistics and changelog
+  - If a plan doesn't exist yet, use --register instead of --update
+  - Be descriptive in the --note parameter to document why status changed
+
+  # Example Workflow
+
+  **Scenario: User starts implementing authentication feature**
+
+  1. Check docs/plans/ for relevant plan file (e.g., 2026-01-08-auth-module.md)
+  2. Run: `node scripts/update-plan-status.js --update --file=2026-01-08-auth-module.md --status=in-progress --note="Started implementing login endpoint"`
+  3. Verify index.md was updated
+  4. Report: "Updated plan 'Authentication Module' to In Progress"
+
+  Remember: This skill should be used automatically at appropriate workflow stages, not just when explicitly requested by the user.

@@ -144,6 +144,8 @@ node scripts/update-plan-status.js --update \
 node scripts/update-plan-status.js --list
 ```
 
+**Note**: Skills are located in `.claude/skills/` in the project root and are versioned in git for team-wide availability.
+
 ### Archiving Completed Plans
 
 Plans are NOT automatically archived. Archive manually when needed:
@@ -426,6 +428,67 @@ Tasks that don't meet quality gates should **NOT** be marked as completed.
 3. **Review for performance** - Are there bottlenecks?
 4. **Review for security** - Are there vulnerabilities?
 5. **Review for tests** - Is coverage adequate?
+
+---
+
+## Plan Status Verification
+
+Use verification tools to keep `/docs/plans/index.md` synchronized with reality.
+
+### Automatic Verification
+
+Run the verification script to auto-fix obvious issues and report problems:
+
+```bash
+./scripts/verify-plan-status.sh
+```
+
+**Auto-fixes:**
+- ✅ Statistics (counts and percentages)
+- ✅ Last Updated date
+- ✅ Markdown formatting
+
+**Reports for review:**
+- ⚠️ Stale plans (no commits in 7+ days)
+- ⚠️ Long-running plans (30+ days)
+- ⚠️ Missing files
+- ⚠️ Status inconsistencies
+
+### Intelligent Synchronization
+
+Use the `/sync-plan-status` skill for Claude to analyze code and update statuses:
+
+```bash
+# In Claude Code CLI
+/sync-plan-status
+```
+
+**Note**: The `update-plan-status` and `sync-plan-status` skills are located in `.claude/skills/` and are part of this project's repository.
+
+**What Claude does:**
+1. Runs verification script first
+2. For each warning/discrepancy:
+   - Reads plan document
+   - Checks codebase for implementation
+   - Reviews git commits and activity
+   - Analyzes tests and TODOs
+3. Suggests status updates with evidence
+4. Asks for confirmation before updating
+5. Updates index.md with detailed notes
+
+**When to sync:**
+- After major development milestones
+- Weekly/monthly project audits
+- When index.md seems out of date
+- Before project status meetings
+
+### Best Practices
+
+1. **Run verification regularly** - Weekly or after major changes
+2. **Investigate warnings** - Stale plans may need status updates
+3. **Use sync for deep analysis** - Let Claude verify implementation state
+4. **Keep plans current** - Update as work progresses, not in batches
+5. **Archive old plans** - Keep active plans visible and relevant
 
 ---
 

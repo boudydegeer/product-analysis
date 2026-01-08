@@ -72,7 +72,62 @@ Archived files location:
 
 ---
 
-### 2. `check-services.sh`
+### 2. `verify-plan-status.sh`
+
+Verifies consistency between docs/plans/index.md and the actual project state.
+
+#### Purpose:
+- Auto-fixes obvious issues (statistics, dates, formatting)
+- Reports plans that may be stale or incorrect
+- Suggests status updates based on git history
+- Validates plan file existence and links
+
+#### Usage:
+
+```bash
+# Run verification with auto-fixes
+./scripts/verify-plan-status.sh
+
+# Report only, no auto-fixes
+./scripts/verify-plan-status.sh --report-only
+
+# Verbose output
+./scripts/verify-plan-status.sh --verbose
+
+# Dry-run (preview fixes)
+./scripts/verify-plan-status.sh --dry-run
+
+# Show help
+./scripts/verify-plan-status.sh --help
+```
+
+#### What it checks:
+- ✅ Plan file existence (referenced in index.md)
+- ✅ Statistics accuracy (counts and percentages)
+- ✅ Staleness (plans without recent commits)
+- ✅ Consistency (status matches section)
+- ✅ Last Updated date
+
+#### Auto-fixed issues:
+- Statistics if counts/percentages are wrong
+- Last Updated date if outdated
+- Markdown formatting issues
+
+#### Reported issues (require decision):
+- Plans "In Progress" without commits in 7+ days
+- Plans "Ready" or "In Progress" for 30+ days
+- Missing plan files
+- Orphaned plan files not in index
+- Plans in wrong section
+
+#### Exit codes:
+- 0: All checks passed
+- 1: Warnings found (plans may need attention)
+- 2: Errors found (missing files, broken references)
+
+---
+
+### 3. `check-services.sh`
 
 Checks if backend, frontend, and database services are running on their configured ports.
 
@@ -123,7 +178,88 @@ Quick links:
 
 ---
 
-### 3. `start-services.sh`
+### 3. `dev.sh`
+
+Starts backend and frontend services in FOREGROUND with real-time interleaved logs - ideal for local development.
+
+#### What it does:
+
+1. **Checks prerequisites** - Verifies PostgreSQL is running
+2. **Validates ports** - Ensures ports 8891 and 8892 are free (exits with error if occupied)
+3. **Starts both services in foreground** - Runs backend and frontend simultaneously
+4. **Shows real-time logs** - Displays output from both services in the same terminal with color-coded prefixes
+5. **Clean shutdown** - Ctrl+C kills both processes cleanly
+
+#### Usage:
+
+```bash
+# From project root
+./scripts/dev.sh
+```
+
+#### Prerequisites:
+
+- PostgreSQL running on port 5432
+- Backend dependencies installed: `cd backend && poetry install`
+- Frontend dependencies installed: `cd frontend && npm install`
+- Ports 8891 and 8892 must be free
+
+#### Log Prefixes:
+
+- `[BACKEND]` - Cyan colored, for backend logs
+- `[FRONTEND]` - Green colored, for frontend logs
+
+#### Stopping:
+
+- Press `Ctrl+C` to stop both services cleanly
+- The script automatically kills both processes and cleans up
+
+#### Example Output:
+
+```
+╔════════════════════════════════════════════════════════════╗
+║         Development Environment - Product Analysis        ║
+╚════════════════════════════════════════════════════════════╝
+
+Checking prerequisites...
+✓ PostgreSQL is running
+
+╔════════════════════════════════════════════════════════════╗
+║  ✓ Prerequisites OK - Starting services...               ║
+╚════════════════════════════════════════════════════════════╝
+
+Quick links:
+  Frontend: http://localhost:8892
+  Backend:  http://localhost:8891
+  API Docs: http://localhost:8891/docs
+
+Press Ctrl+C to stop all services
+
+════════════════════════════════════════════════════════════
+
+[BACKEND]  INFO:     Uvicorn running on http://0.0.0.0:8891
+[BACKEND]  INFO:     Application startup complete
+[FRONTEND] VITE v7.3.1  ready in 234 ms
+[FRONTEND] ➜  Local:   http://localhost:8892/
+[BACKEND]  INFO:     127.0.0.1:54321 - "GET /docs HTTP/1.1" 200 OK
+[FRONTEND] ➜  Network: use --host to expose
+```
+
+#### When to Use:
+
+- **Local development** - Perfect for actively developing and seeing logs in real-time
+- **Debugging** - Easier to see errors and logs from both services simultaneously
+- **Quick testing** - Fast startup, easy to stop/restart with Ctrl+C
+
+#### When NOT to Use:
+
+- **Background services** - Use `start-services.sh` instead if you want services running in background
+- **CI/CD** - Use individual service commands or `start-services.sh`
+- **Production** - Never use for production deployments
+
+---
+
+### 4. `start-services.sh`
 
 Starts backend and frontend services in the background with logging.
 
@@ -203,7 +339,7 @@ Stop services with: ./scripts/stop-services.sh
 
 ---
 
-### 4. `stop-services.sh`
+### 5. `stop-services.sh`
 
 Stops backend and frontend services started by `start-services.sh`.
 
@@ -242,7 +378,7 @@ Stopping frontend (PID: 12346)...
 
 ---
 
-### 5. `verify-quality-backend.sh`
+### 6. `verify-quality-backend.sh`
 
 Verifies quality gates for the **FastAPI/Python backend**.
 
@@ -301,7 +437,7 @@ chmod +x scripts/verify-quality-backend.sh
 
 ---
 
-### 6. `verify-quality-frontend.sh`
+### 7. `verify-quality-frontend.sh`
 
 Verifies quality gates for the **Vue 3/TypeScript frontend**.
 
@@ -394,6 +530,27 @@ The following ports are used by default:
 ---
 
 ## Quick Start Guide
+
+### Option A: Development Mode (Foreground with Real-time Logs)
+
+Ideal for active development - see all logs in real-time, easy to restart:
+
+```bash
+# 1. Start PostgreSQL
+docker run --name postgres-dev \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=product_analysis \
+  -p 5432:5432 -d postgres:16
+
+# 2. Start both services with real-time logs
+./scripts/dev.sh
+
+# Press Ctrl+C to stop when done
+```
+
+### Option B: Background Services (Production-like)
+
+Services run in background, logs saved to files:
 
 ```bash
 # 1. Start PostgreSQL
@@ -582,6 +739,7 @@ After cloning the repository, you may need to make the scripts executable:
 ```bash
 chmod +x scripts/archive-plan.sh
 chmod +x scripts/check-services.sh
+chmod +x scripts/dev.sh
 chmod +x scripts/start-services.sh
 chmod +x scripts/stop-services.sh
 chmod +x scripts/verify-quality-backend.sh
@@ -593,11 +751,22 @@ Or run them directly with bash:
 ```bash
 bash scripts/archive-plan.sh plan.md
 bash scripts/check-services.sh
+bash scripts/dev.sh
 bash scripts/start-services.sh
 bash scripts/stop-services.sh
 bash scripts/verify-quality-backend.sh
 bash scripts/verify-quality-frontend.sh
 ```
+
+---
+
+## Skills
+
+This project includes custom Claude Code skills in `.claude/skills/`:
+- `update-plan-status/` - Auto-updates plan status during workflow
+- `sync-plan-status/` - Intelligently syncs plan status with codebase
+
+See `.claude/skills/README.md` for details on how to use them.
 
 ---
 

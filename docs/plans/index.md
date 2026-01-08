@@ -1,6 +1,6 @@
 # Product Analysis Platform - Plans Index
 
-**Last Updated:** 2026-01-07
+**Last Updated:** 2026-01-08
 
 This document tracks the status of all implementation plans for the Product Analysis Platform.
 
@@ -55,6 +55,24 @@ This document tracks the status of all implementation plans for the Product Anal
 
 ---
 
+### [Analysis Details UI Design Specification](./2026-01-08-analysis-details-ui-design.md)
+**Status:** ✅ Done
+**Description:** Design document for displaying AI-generated feature analysis in a four-tab interface
+
+
+---
+
+---
+
+## 🟡 In Progress
+
+### [Analysis Details UI Implementation Plan](./2026-01-08-analysis-details-ui-implementation.md)
+**Status:** 🟡 In Progress
+**Description:** Implementation plan for analysis details interface with flattened schema, API endpoint, and Vue components
+
+
+---
+
 ## 🔴 Backlog
 
 ### [Product Analysis Platform - Full Design](./2026-01-07-product-analysis-platform-design.md)
@@ -99,14 +117,15 @@ This document tracks the status of all implementation plans for the Product Anal
 
 ---
 
+---
+
 ## 📊 Summary Statistics
 
 | Status | Count | Percentage |
 |--------|-------|------------|
-| ✅ Done | 2 | 40% |
-| 🟢 For Review | 0 | 0% |
-| 🟡 In Progress | 0 | 0% |
-| 🔴 Backlog | 3 modules | 60% |
+| ✅ Done | 3 | 60% |
+| 🟡 In Progress | 1 | 20% |
+| 🔴 Backlog | 1 | 20% |
 
 ### Completed Features
 - Feature Analysis Module (MVP)
@@ -140,6 +159,10 @@ This document tracks the status of all implementation plans for the Product Anal
 ---
 
 ## 📝 Change Log
+
+### 2026-01-08
+- 🟡 Registered new plan: [Analysis Details UI Implementation Plan](./2026-01-08-analysis-details-ui-implementation.md) as In Progress
+- ✅ Registered new plan: [Analysis Details UI Design Specification](./2026-01-08-analysis-details-ui-design.md) as Done
 
 ### 2026-01-07
 - ✅ Completed MVP Implementation Plan

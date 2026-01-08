@@ -1,0 +1,148 @@
+name: sync-plan-status
+description: Intelligently sync plan statuses by analyzing code, commits, and implementation state
+user_invocable: true
+
+prompt: |
+  You are synchronizing plan statuses with the actual state of the codebase.
+
+  # Task
+
+  Analyze the project to determine if plan statuses in `/docs/plans/index.md` accurately reflect reality.
+
+  # Process
+
+  1. **Run verification script first**:
+     ```bash
+     ./scripts/verify-plan-status.sh
+     ```
+     This will auto-fix obvious issues and report warnings.
+
+  2. **For each plan with warnings or doubts**:
+
+     a. **Read the plan document** (in docs/plans/)
+        - Understand what was planned
+        - Identify key deliverables and milestones
+
+     b. **Check implementation state**:
+        - Search for related files in the codebase
+        - Check if planned features are implemented
+        - Look for tests related to the plan
+        - Review recent commits mentioning the plan/feature
+
+     c. **Analyze git history**:
+        ```bash
+        # Find commits related to this plan/feature
+        git log --all --oneline --grep="keyword" --since="30 days ago"
+        ```
+
+     d. **Determine actual status**:
+        - **Backlog**: No code written, just design
+        - **Ready**: Plan exists, no implementation yet
+        - **In Progress**: Partial implementation, active commits
+        - **For Review**: Implementation complete, needs testing/review
+        - **Done**: Fully implemented, tested, merged
+        - **Blocked**: No progress, no recent activity, stuck
+
+  3. **For each discrepancy found**:
+
+     a. **Explain the discrepancy** to the user:
+        - Current status in index.md
+        - Actual status based on code/commits
+        - Evidence (files, commits, tests)
+
+     b. **Ask for confirmation** using AskUserQuestion:
+        - Propose new status
+        - Explain reasoning
+        - Let user approve/reject/modify
+
+     c. **Update if approved**:
+        ```bash
+        node scripts/update-plan-status.js --update \
+          --file=<plan-file> \
+          --status=<new-status> \
+          --note="Synced based on codebase analysis: <reason>"
+        ```
+
+  4. **Provide summary report**:
+     - Plans analyzed: X
+     - Plans updated: Y
+     - Plans still accurate: Z
+     - Plans needing attention: W
+
+  # When to Use This Skill
+
+  - When user explicitly runs `/sync-plan-status`
+  - Periodically (user-initiated) to audit project state
+  - After major development milestones
+  - When index.md seems out of sync with reality
+
+  # Analysis Strategy
+
+  For each plan status, look for these indicators:
+
+  **In Progress → Done?**
+  - All planned files exist and are implemented
+  - Tests exist and are passing
+  - No TODOs or FIXMEs related to this plan
+  - Recent commit with "feat: complete X" or similar
+  - No activity in last 7-14 days (might be done)
+
+  **In Progress → Blocked?**
+  - No commits in >14 days
+  - Open issues or TODOs blocking progress
+  - Incomplete implementation with no recent activity
+
+  **Ready → In Progress?**
+  - Implementation files have been created
+  - Commits referencing this feature exist
+  - Tests are being written
+
+  **Done → Should be archived?**
+  - Plan completed >30 days ago
+  - No recent changes to related code
+  - Feature is stable and not under active development
+
+  # Important Notes
+
+  - **Always ask before changing status** - Don't auto-update without confirmation
+  - **Provide evidence** - Show commits, files, tests that justify status change
+  - **Be conservative** - When in doubt, keep current status or ask user
+  - **Document reasoning** - Use detailed --note parameter when updating
+  - **Handle archived plans** - Don't try to sync plans in archived/ folder
+
+  # Example Workflow
+
+  **Scenario: Plan shows "In Progress" but feature is complete**
+
+  1. Read plan: "Authentication Module - Add login/logout endpoints"
+  2. Check code:
+     - `app/api/auth.py` exists with login/logout endpoints
+     - `tests/test_auth.py` exists with passing tests
+     - No auth-related TODOs in codebase
+  3. Check commits:
+     ```bash
+     git log --oneline --grep="auth" --since="30 days ago"
+     # Shows: "feat: add login endpoint" (14 days ago)
+     #        "feat: add logout endpoint" (12 days ago)
+     #        "test: add auth tests" (12 days ago)
+     # No commits since then
+     ```
+  4. Ask user:
+     "Plan 'Authentication Module' is marked 'In Progress' but appears complete:
+     - ✅ Login endpoint implemented (app/api/auth.py)
+     - ✅ Logout endpoint implemented
+     - ✅ Tests written and passing (tests/test_auth.py)
+     - ✅ No auth-related TODOs
+     - ⏱ No commits in 12 days
+
+     Should I update status to 'Done'?"
+
+  5. If approved, update:
+     ```bash
+     node scripts/update-plan-status.js --update \
+       --file=2026-01-08-auth-module.md \
+       --status=done \
+       --note="Synced: all endpoints implemented and tested, no activity in 12 days"
+     ```
+
+  Remember: This skill requires deep codebase analysis. Use search tools (Grep, Glob, Read) extensively to gather evidence before suggesting status changes.

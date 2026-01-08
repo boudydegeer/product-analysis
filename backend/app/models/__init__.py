@@ -9,6 +9,7 @@ from app.models.brainstorm import (
     BrainstormSessionStatus,
     MessageRole,
 )
+from app.models.idea import Idea, IdeaStatus, IdeaPriority
 
 __all__ = [
     "Base",
@@ -20,4 +21,7 @@ __all__ = [
     "BrainstormMessage",
     "BrainstormSessionStatus",
     "MessageRole",
+    "Idea",
+    "IdeaStatus",
+    "IdeaPriority",
 ]

@@ -7,6 +7,10 @@ from app.database import get_db
 from app.models import Base
 
 # Import all models to ensure they're registered with Base metadata
+from app.models.feature import Feature
+from app.models.analysis import Analysis
+from app.models.idea import Idea
+from app.models.brainstorm import BrainstormSession, BrainstormMessage
 
 
 # Test database URL
@@ -19,7 +23,7 @@ def anyio_backend():
     return "asyncio"
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 async def test_db():
     """Create a test database with tables."""
     # Create async engine for testing with in-memory SQLite

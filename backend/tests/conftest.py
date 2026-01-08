@@ -1,7 +1,7 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import StaticPool
 
 from app.database import get_db
 from app.models import Base
@@ -14,6 +14,9 @@ from app.models import (
     BrainstormMessage,
     BrainstormSessionStatus,
     MessageRole,
+    Idea,
+    IdeaStatus,
+    IdeaPriority,
 )
 
 
@@ -31,10 +34,12 @@ def anyio_backend():
 async def test_db():
     """Create a test database with tables."""
     # Create async engine for testing with in-memory SQLite
+    # Use StaticPool to ensure all connections use the same in-memory database
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,
-        poolclass=NullPool,
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
     )
 
     # Create tables

@@ -89,7 +89,7 @@ class AnalysisRisksResponse(BaseModel):
 class AnalysisRecommendationsResponse(BaseModel):
     """Analysis recommendations section."""
 
-    improvements: list[dict[str, Any]] = Field(
+    improvements: list[str] = Field(
         default_factory=list, description="Suggested improvements"
     )
     best_practices: list[str] = Field(

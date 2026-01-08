@@ -5,7 +5,9 @@ import {
   BarChart3,
   Frame,
   LayoutDashboard,
+  Lightbulb,
   Map,
+  MessageSquare,
   Package,
   PieChart,
   Settings,
@@ -68,6 +70,16 @@ const data = {
           url: '/analysis/export',
         },
       ],
+    },
+    {
+      title: 'Ideas',
+      url: '/ideas',
+      icon: Lightbulb,
+    },
+    {
+      title: 'Brainstorming',
+      url: '/brainstorm',
+      icon: MessageSquare,
     },
     {
       title: 'Settings',

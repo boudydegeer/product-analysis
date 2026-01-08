@@ -45,6 +45,18 @@ const routes: RouteRecordRaw[] = [
         name: 'brainstorm-detail',
         component: () => import('@/views/BrainstormDetailView.vue'),
         meta: { title: 'Brainstorming Session' },
+      },
+      {
+        path: 'ideas',
+        name: 'ideas',
+        component: () => import('@/views/IdeasView.vue'),
+        meta: { title: 'Ideas' },
+      },
+      {
+        path: 'ideas/:id',
+        name: 'idea-detail',
+        component: () => import('@/views/IdeaDetailView.vue'),
+        meta: { title: 'Idea Details' },
       }
     ]
   }

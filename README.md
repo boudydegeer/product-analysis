@@ -33,6 +33,18 @@ See [docs/features/analysis-details-ui.md](docs/features/analysis-details-ui.md)
 
 ## Modules
 
+### Module 3: Ideas Management ✅
+
+Capture, evaluate, and prioritize product ideas with AI-powered analysis.
+
+- Create and manage product ideas
+- AI evaluation with Claude (business value, complexity, effort, market fit, risks)
+- Filter by status and priority
+- Status tracking (backlog → under review → approved → rejected → implemented)
+- Priority levels (low, medium, high, critical)
+
+[Full Documentation](docs/IDEAS_MODULE.md)
+
 ### Module 4: Brainstorming Sessions ✅
 
 Real-time collaborative ideation with Claude AI co-facilitation.

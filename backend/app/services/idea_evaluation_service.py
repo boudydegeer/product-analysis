@@ -32,7 +32,7 @@ Return your evaluation as JSON with this exact structure:
 
 Be objective, concise, and data-driven in your analysis."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-5-20250514") -> None:
+    def __init__(self, api_key: str, model: str = "claude-sonnet-4-5") -> None:
         """Initialize the evaluation service.
 
         Args:

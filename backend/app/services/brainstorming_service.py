@@ -29,7 +29,7 @@ Guidelines:
 
 You have access to WebSearch and WebFetch tools for research."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-5-20250514") -> None:
+    def __init__(self, api_key: str, model: str = "claude-sonnet-4-5") -> None:
         """Initialize the brainstorming service.
 
         Args:

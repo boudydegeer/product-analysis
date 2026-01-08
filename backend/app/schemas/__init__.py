@@ -8,6 +8,13 @@ from app.schemas.feature import (
 )
 from app.schemas.analysis import AnalysisResponse
 from app.schemas.webhook import AnalysisResultWebhook
+from app.schemas.brainstorm import (
+    BrainstormSessionCreate,
+    BrainstormSessionUpdate,
+    BrainstormSessionResponse,
+    BrainstormMessageCreate,
+    BrainstormMessageResponse,
+)
 
 __all__ = [
     "FeatureBase",
@@ -16,4 +23,9 @@ __all__ = [
     "FeatureResponse",
     "AnalysisResponse",
     "AnalysisResultWebhook",
+    "BrainstormSessionCreate",
+    "BrainstormSessionUpdate",
+    "BrainstormSessionResponse",
+    "BrainstormMessageCreate",
+    "BrainstormMessageResponse",
 ]

@@ -18,7 +18,7 @@ FastAPI backend for the Product Analysis Platform.
 
 3. Run development server:
    ```bash
-   poetry run uvicorn app.main:app --reload --port 8000
+   poetry run uvicorn app.main:app --reload --port 8891
    ```
 
 ## Testing
@@ -30,5 +30,5 @@ poetry run pytest -v
 ## API Documentation
 
 Once the server is running, visit:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: http://localhost:8891/docs
+- ReDoc: http://localhost:8891/redoc

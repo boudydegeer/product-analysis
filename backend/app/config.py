@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     # Application
     app_name: str = "Product Analysis Platform"
     debug: bool = False
+    port: int = 8891
 
     # Database
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/product_analysis"
@@ -34,11 +35,13 @@ class Settings(BaseSettings):
 
     # CORS
     cors_origins: list[str] = [
-        "http://localhost:5173",  # Vite dev server (default)
+        "http://localhost:8892",  # Frontend dev server (default)
+        "http://localhost:5173",  # Vite dev server (fallback)
         "http://localhost:5174",  # Vite fallback port
         "http://localhost:5175",  # Vite fallback port
         "http://localhost:5176",  # Vite fallback port
         "http://localhost:3000",  # Alternative port
+        "http://127.0.0.1:8892",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
         "http://127.0.0.1:5175",

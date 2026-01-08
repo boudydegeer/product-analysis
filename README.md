@@ -31,6 +31,20 @@ View comprehensive AI-generated analysis for features in a four-tab interface:
 
 See [docs/features/analysis-details-ui.md](docs/features/analysis-details-ui.md) for details.
 
+## Modules
+
+### Module 4: Brainstorming Sessions ✅
+
+Real-time collaborative ideation with Claude AI co-facilitation.
+
+- Create and manage brainstorming sessions
+- Stream AI responses with Server-Sent Events
+- Persistent conversation history
+- Session status tracking (active, paused, completed, archived)
+- Chat interface with real-time updates
+
+[Full Documentation](docs/BRAINSTORMING_MODULE.md)
+
 ## Quick Start
 
 ### Prerequisites

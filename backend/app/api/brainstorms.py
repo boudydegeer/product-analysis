@@ -1,17 +1,21 @@
 """Brainstorm sessions API endpoints."""
+import json
 import logging
 from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
-from app.models.brainstorm import BrainstormSession, BrainstormSessionStatus
+from app.models.brainstorm import BrainstormSession, BrainstormSessionStatus, BrainstormMessage, MessageRole
 from app.schemas.brainstorm import (
     BrainstormSessionCreate,
     BrainstormSessionUpdate,
     BrainstormSessionResponse,
 )
+from app.services.brainstorming_service import BrainstormingService
 
 logger = logging.getLogger(__name__)
 
@@ -187,3 +191,98 @@ async def delete_brainstorm_session(
     await db.commit()
 
     logger.info(f"Deleted brainstorm session: {session_id}")
+
+
+@router.get("/{session_id}/stream")
+async def stream_brainstorm(
+    session_id: str,
+    message: str,
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    """Stream brainstorm conversation with Claude.
+
+    Args:
+        session_id: Session ID
+        message: User message
+        db: Database session
+
+    Returns:
+        SSE stream of Claude's response
+
+    Raises:
+        HTTPException: If session not found or API key not configured
+    """
+    # Verify session exists
+    result = await db.execute(
+        select(BrainstormSession).where(BrainstormSession.id == session_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Brainstorm session {session_id} not found",
+        )
+
+    if not settings.anthropic_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Anthropic API key not configured",
+        )
+
+    # Save user message
+    user_message = BrainstormMessage(
+        id=str(uuid4()),
+        session_id=session_id,
+        role=MessageRole.USER,
+        content=message,
+    )
+    db.add(user_message)
+    await db.commit()
+
+    # Build conversation history
+    messages = [
+        {"role": msg.role.value, "content": msg.content}
+        for msg in session.messages
+    ]
+    messages.append({"role": "user", "content": message})
+
+    # Stream response
+    async def event_generator():
+        """Generate SSE events."""
+        assistant_content = ""
+
+        try:
+            async with BrainstormingService(
+                api_key=settings.anthropic_api_key
+            ) as brainstorm_service:
+                async for chunk in brainstorm_service.stream_brainstorm_message(
+                    messages
+                ):
+                    assistant_content += chunk
+                    yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+
+            # Save assistant message
+            assistant_message = BrainstormMessage(
+                id=str(uuid4()),
+                session_id=session_id,
+                role=MessageRole.ASSISTANT,
+                content=assistant_content,
+            )
+            db.add(assistant_message)
+            await db.commit()
+
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+        except Exception as e:
+            logger.error(f"Error streaming brainstorm: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )

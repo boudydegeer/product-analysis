@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     analysis_polling_interval_seconds: int = 30  # Check every 30 seconds
     analysis_polling_timeout_seconds: int = 900  # Give up after 15 minutes
 
+    # Anthropic
+    anthropic_api_key: str = ""
+
     # CORS
     cors_origins: list[str] = [
         "http://localhost:8892",  # Frontend dev server (default)

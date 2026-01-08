@@ -1,14 +1,13 @@
-"""Service for AI-powered brainstorming with Claude."""
+"""Service for AI-powered brainstorming with Claude Agent SDK."""
 import logging
 from typing import AsyncGenerator, Any
-from anthropic import AsyncAnthropic
-from anthropic.types import MessageParam
+from claude_agent_sdk import Agent, AgentResponse
 
 logger = logging.getLogger(__name__)
 
 
 class BrainstormingService:
-    """Service for brainstorming with Claude via streaming."""
+    """Service for brainstorming with Claude via streaming using Agent SDK."""
 
     SYSTEM_PROMPT = """You are an AI co-facilitator in a product brainstorming session.
 
@@ -38,21 +37,11 @@ You have access to WebSearch and WebFetch tools for research."""
         """
         self.api_key = api_key
         self.model = model
-        self.client = AsyncAnthropic(api_key=api_key)
-
-    def _format_messages(self, messages: list[dict[str, str]]) -> list[MessageParam]:
-        """Format messages for Claude API.
-
-        Args:
-            messages: List of message dicts with 'role' and 'content'
-
-        Returns:
-            Formatted messages
-        """
-        return [
-            MessageParam(role=msg["role"], content=msg["content"])  # type: ignore[typeddict-item]
-            for msg in messages
-        ]
+        self.agent = Agent(
+            api_key=api_key,
+            model=model,
+            system_prompt=self.SYSTEM_PROMPT,
+        )
 
     async def stream_brainstorm_message(
         self, messages: list[dict[str, str]]
@@ -66,16 +55,27 @@ You have access to WebSearch and WebFetch tools for research."""
             Text chunks from Claude's response
         """
         try:
-            formatted_messages = self._format_messages(messages)
+            # Get the last user message
+            if not messages:
+                return
 
-            async with self.client.messages.stream(
-                model=self.model,
-                max_tokens=4096,
-                system=self.SYSTEM_PROMPT,
-                messages=formatted_messages,
-            ) as stream:
-                async for text in stream.text_stream:
-                    yield text
+            last_message = messages[-1]["content"] if messages else ""
+
+            # Build conversation history for context (all messages except the last one)
+            conversation_history = [
+                {"role": msg["role"], "content": msg["content"]}
+                for msg in messages[:-1]
+            ]
+
+            # Stream response from agent
+            async for chunk in self.agent.stream(
+                prompt=last_message,
+                conversation_history=conversation_history,
+            ):
+                if isinstance(chunk, str):
+                    yield chunk
+                elif hasattr(chunk, 'content'):
+                    yield chunk.content
 
         except Exception as e:
             logger.error(f"Error streaming brainstorm message: {e}")
@@ -83,7 +83,8 @@ You have access to WebSearch and WebFetch tools for research."""
 
     async def close(self) -> None:
         """Close the service and cleanup resources."""
-        await self.client.close()
+        # Agent SDK handles cleanup automatically
+        pass
 
     async def __aenter__(self) -> "BrainstormingService":
         """Async context manager entry."""

@@ -1,16 +1,15 @@
-"""Service for AI-powered idea evaluation with Claude."""
+"""Service for AI-powered idea evaluation with Claude Agent SDK."""
 import logging
 import json
 import re
 from typing import Any
-from anthropic import AsyncAnthropic
-from anthropic.types import TextBlock
+from claude_agent_sdk import Agent
 
 logger = logging.getLogger(__name__)
 
 
 class IdeaEvaluationService:
-    """Service for evaluating product ideas with Claude."""
+    """Service for evaluating product ideas with Claude Agent SDK."""
 
     SYSTEM_PROMPT = """You are an AI product analyst evaluating product ideas.
 
@@ -41,7 +40,11 @@ Be objective, concise, and data-driven in your analysis."""
         """
         self.api_key = api_key
         self.model = model
-        self.client = AsyncAnthropic(api_key=api_key)
+        self.agent = Agent(
+            api_key=api_key,
+            model=model,
+            system_prompt=self.SYSTEM_PROMPT,
+        )
 
     async def evaluate_idea(
         self, title: str, description: str, context: str | None = None
@@ -72,19 +75,20 @@ Description: {description}"""
 
             prompt += "\n\nProvide your evaluation as JSON."
 
-            # Call Claude
-            response = await self.client.messages.create(
-                model=self.model,
-                max_tokens=2048,
-                system=self.SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            # Call Claude Agent
+            response = await self.agent.run(prompt=prompt)
+
+            # Extract text from response
+            if isinstance(response, str):
+                response_text = response
+            elif hasattr(response, 'content'):
+                response_text = response.content
+            elif hasattr(response, 'text'):
+                response_text = response.text
+            else:
+                response_text = str(response)
 
             # Parse response
-            first_block = response.content[0]
-            if not isinstance(first_block, TextBlock):
-                raise ValueError("Expected TextBlock in response")
-            response_text = first_block.text
             result = self._parse_evaluation_result(response_text)
 
             logger.info(f"Successfully evaluated idea: {title}")
@@ -149,7 +153,8 @@ Description: {description}"""
 
     async def close(self) -> None:
         """Close the service and cleanup resources."""
-        await self.client.close()
+        # Agent SDK handles cleanup automatically
+        pass
 
     async def __aenter__(self) -> "IdeaEvaluationService":
         """Async context manager entry."""

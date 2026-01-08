@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { Feature, FeatureCreate, FeatureUpdate } from '@/types/feature'
+import type { AnalysisResponse } from '@/types/analysis'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8891/api/v1'
 
@@ -43,6 +44,12 @@ export const featureApi = {
   // Trigger analysis
   triggerAnalysis: async (id: string): Promise<void> => {
     await api.post(`/features/${id}/analyze`, {})
+  },
+
+  // Get analysis details
+  getAnalysis: async (id: string): Promise<AnalysisResponse> => {
+    const response = await api.get(`/features/${id}/analysis`)
+    return response.data
   },
 }
 

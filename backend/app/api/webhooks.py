@@ -103,12 +103,35 @@ async def receive_analysis_result(
         "metadata": webhook_data.metadata,
     }
 
+    # Extract flattened data from nested structure
+    complexity = webhook_data.complexity or {}
+    summary = complexity.get("summary", {})
+    implementation = complexity.get("implementation", {})
+
+    # Create Analysis record with flattened fields
     analysis = Analysis(
         feature_id=feature.id,
-        result=result_data,
-        tokens_used=0,  # Webhook doesn't provide token count
-        model_used="github-workflow",  # Indicate this came from workflow
+        result=result_data,  # Keep full data for backward compatibility
+        tokens_used=0,
+        model_used="github-workflow",
         completed_at=datetime.now(UTC),
+        # Flattened summary
+        summary_overview=summary.get("overview"),
+        summary_key_points=summary.get("key_points", []),
+        summary_metrics=summary.get("metrics", {}),
+        # Flattened implementation
+        implementation_architecture=implementation.get("architecture"),
+        implementation_technical_details=implementation.get("technical_details", []),
+        implementation_data_flow=implementation.get("data_flow"),
+        # Flattened risks
+        risks_technical_risks=webhook_data.technical_risks or [],
+        risks_security_concerns=[],  # Extract from technical_risks if needed
+        risks_scalability_issues=[],  # Extract from technical_risks if needed
+        risks_mitigation_strategies=[],  # Could extract from recommendations
+        # Flattened recommendations
+        recommendations_improvements=webhook_data.recommendations.get("improvements", []) if webhook_data.recommendations else [],
+        recommendations_best_practices=webhook_data.recommendations.get("best_practices", []) if webhook_data.recommendations else [],
+        recommendations_next_steps=webhook_data.recommendations.get("next_steps", []) if webhook_data.recommendations else [],
     )
 
     db.add(analysis)

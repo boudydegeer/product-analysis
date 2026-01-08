@@ -395,3 +395,78 @@ class TestWebhookEndpoint:
 
         # Assert
         assert response.status_code == 422  # Validation error
+
+
+@pytest.mark.asyncio
+async def test_webhook_saves_flattened_analysis(
+    async_client: AsyncClient, db_session: AsyncSession
+):
+    """Test webhook saves analysis in flattened format."""
+    from app.models.analysis import Analysis
+    from sqlalchemy import select
+
+    # Create feature
+    feature = Feature(
+        id="webhook-test-flat",
+        name="Webhook Test Feature",
+        description="Testing flattened save",
+        status=FeatureStatus.ANALYZING,
+        webhook_secret="test-secret-flat",
+    )
+    db_session.add(feature)
+    await db_session.commit()
+
+    # Prepare webhook payload with nested structure
+    payload = {
+        "feature_id": "webhook-test-flat",
+        "complexity": {
+            "summary": {
+                "overview": "This feature is complex",
+                "key_points": ["Point 1", "Point 2"],
+                "metrics": {"complexity": "high", "confidence": 0.9}
+            },
+            "implementation": {
+                "architecture": {"pattern": "Microservices"},
+                "technical_details": [{"category": "API"}],
+                "data_flow": {"steps": ["Step 1"]}
+            }
+        },
+        "warnings": [],
+        "repository_state": {},
+        "affected_modules": [],
+        "implementation_tasks": [],
+        "technical_risks": [{"severity": "medium"}],
+        "recommendations": {
+            "improvements": [{"priority": "high"}],
+            "best_practices": ["Practice 1"],
+            "next_steps": ["Step 1"]
+        },
+        "error": None,
+        "raw_output": "Raw output",
+        "metadata": {},
+    }
+
+    payload_str = json.dumps(payload)
+    signature = compute_webhook_signature(payload_str, "test-secret-flat")
+
+    # Send webhook
+    response = await async_client.post(
+        "/api/v1/webhooks/analysis-result",
+        json=payload,
+        headers={"X-Webhook-Signature": signature},
+    )
+
+    assert response.status_code == 200
+
+    # Verify flattened data was saved
+    result = await db_session.execute(
+        select(Analysis).where(Analysis.feature_id == "webhook-test-flat")
+    )
+    analysis = result.scalar_one()
+
+    assert analysis.summary_overview == "This feature is complex"
+    assert analysis.summary_key_points == ["Point 1", "Point 2"]
+    assert analysis.summary_metrics["complexity"] == "high"
+    assert analysis.implementation_architecture["pattern"] == "Microservices"
+    assert analysis.risks_technical_risks[0]["severity"] == "medium"
+    assert analysis.recommendations_improvements[0]["priority"] == "high"

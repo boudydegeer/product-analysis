@@ -322,6 +322,46 @@ describe('API Client (featuresApi)', () => {
       expect(result).toBeUndefined()
     })
   })
+
+  describe('getAnalysis(id: string)', () => {
+    it('calls GET /api/features/{id}/analysis and returns AnalysisResponse', async () => {
+      const mockAnalysis = {
+        feature_id: 'test-123',
+        feature_name: 'Test Feature',
+        analyzed_at: '2026-01-08T10:30:00Z',
+        status: 'completed',
+        overview: {
+          summary: 'Test summary',
+          key_points: ['Point 1'],
+          metrics: { complexity: 'medium' },
+        },
+        implementation: {
+          architecture: {},
+          technical_details: [],
+          data_flow: {},
+        },
+        risks: {
+          technical_risks: [],
+          security_concerns: [],
+          scalability_issues: [],
+          mitigation_strategies: [],
+        },
+        recommendations: {
+          improvements: [],
+          best_practices: [],
+          next_steps: [],
+        },
+      }
+      mockAxiosInstance.get.mockResolvedValue({ data: mockAnalysis })
+
+      const { featureApi: featuresApi } = await import('@/services/api')
+      const result = await featuresApi.getAnalysis('test-123')
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/features/test-123/analysis')
+      expect(result.feature_id).toBe('test-123')
+      expect(result.status).toBe('completed')
+    })
+  })
 })
 
 describe('API Client Configuration', () => {

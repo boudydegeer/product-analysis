@@ -1,5 +1,6 @@
 import { apiClient } from './client'
 import type { Feature, FeatureCreate, FeatureUpdate } from '../types/feature'
+import type { AnalysisResponse } from '../types/analysis'
 
 /**
  * Response type for triggering analysis
@@ -65,6 +66,15 @@ export const featuresApi = {
       `/features/${id}/analyze`,
       {}
     )
+    return response.data
+  },
+
+  /**
+   * Get analysis details for a feature
+   * GET /api/features/{id}/analysis
+   */
+  async getAnalysis(id: string): Promise<AnalysisResponse> {
+    const response = await apiClient.get<AnalysisResponse>(`/features/${id}/analysis`)
     return response.data
   },
 }

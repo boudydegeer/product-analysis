@@ -12,8 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.models import Feature, FeatureStatus
+from app.models import Feature, FeatureStatus, Analysis
 from app.schemas import FeatureCreate, FeatureUpdate, FeatureResponse
+from app.schemas.analysis import AnalysisDetailResponse, AnalysisErrorResponse
 from app.services.github_service import GitHubService
 from app.utils.webhook_security import generate_webhook_secret
 
@@ -238,3 +239,95 @@ async def trigger_analysis(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to trigger analysis workflow: {str(e)}",
         )
+
+
+@router.get("/{feature_id}/analysis", response_model=AnalysisDetailResponse | AnalysisErrorResponse)
+async def get_feature_analysis(
+    feature_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get analysis details for a feature.
+
+    Args:
+        feature_id: UUID of the feature
+        db: Database session
+
+    Returns:
+        Complete analysis with overview, implementation, risks, and recommendations
+
+    Raises:
+        HTTPException: If feature not found
+    """
+    # Get feature
+    result = await db.execute(select(Feature).where(Feature.id == str(feature_id)))
+    feature = result.scalar_one_or_none()
+
+    if not feature:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Feature {feature_id} not found",
+        )
+
+    # Get most recent analysis
+    result = await db.execute(
+        select(Analysis)
+        .where(Analysis.feature_id == str(feature_id))
+        .order_by(Analysis.created_at.desc())
+        .limit(1)
+    )
+    analysis = result.scalar_one_or_none()
+
+    # Handle no analysis case
+    if not analysis:
+        return AnalysisErrorResponse(
+            feature_id=str(feature_id),
+            status="no_analysis",
+            message="No analysis available for this feature",
+        )
+
+    # Handle analyzing state
+    if feature.status == FeatureStatus.ANALYZING:
+        return AnalysisErrorResponse(
+            feature_id=str(feature_id),
+            status="analyzing",
+            message="Analysis in progress...",
+            started_at=feature.updated_at.isoformat() if feature.updated_at else None,
+        )
+
+    # Handle failed state
+    if feature.status == FeatureStatus.FAILED:
+        return AnalysisErrorResponse(
+            feature_id=str(feature_id),
+            status="failed",
+            message="Analysis failed",
+            failed_at=analysis.completed_at.isoformat() if analysis.completed_at else None,
+        )
+
+    # Return successful analysis
+    return AnalysisDetailResponse(
+        feature_id=str(feature_id),
+        feature_name=feature.name,
+        analyzed_at=analysis.completed_at.isoformat() if analysis.completed_at else None,
+        status="completed",
+        overview={
+            "summary": analysis.summary_overview or "",
+            "key_points": analysis.summary_key_points or [],
+            "metrics": analysis.summary_metrics or {},
+        },
+        implementation={
+            "architecture": analysis.implementation_architecture or {},
+            "technical_details": analysis.implementation_technical_details or [],
+            "data_flow": analysis.implementation_data_flow or {},
+        },
+        risks={
+            "technical_risks": analysis.risks_technical_risks or [],
+            "security_concerns": analysis.risks_security_concerns or [],
+            "scalability_issues": analysis.risks_scalability_issues or [],
+            "mitigation_strategies": analysis.risks_mitigation_strategies or [],
+        },
+        recommendations={
+            "improvements": analysis.recommendations_improvements or [],
+            "best_practices": analysis.recommendations_best_practices or [],
+            "next_steps": analysis.recommendations_next_steps or [],
+        },
+    )

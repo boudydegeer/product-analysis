@@ -25,7 +25,7 @@
     >
       <!-- Messages -->
       <div
-        v-for="message in currentSession?.messages || []"
+        v-for="(message, index) in currentSession?.messages || []"
         :key="message.id"
         :class="[
           'flex',
@@ -58,7 +58,8 @@
               <component
                 :is="getBlockComponent(block.type)"
                 :block="block as any"
-                :interactive="false"
+                :interactive="message.role === 'assistant' && index === (currentSession?.messages.length || 0) - 1"
+                @interact="handleInteraction"
               />
             </template>
           </div>

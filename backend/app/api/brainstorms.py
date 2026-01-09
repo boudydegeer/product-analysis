@@ -381,10 +381,10 @@ async def stream_claude_response(
             conversation.append({"role": "user", "content": " ".join(text_parts)})
         else:
             # For assistant, combine all text blocks
-            text_parts = [
-                b["text"] for b in msg.content.get("blocks", [])
-                if b["type"] == "text"
-            ]
+            text_parts = []
+            for b in msg.content.get("blocks", []):
+                if b["type"] == "text" and "text" in b:
+                    text_parts.append(b["text"])
             if text_parts:
                 conversation.append({"role": "assistant", "content": " ".join(text_parts)})
 

@@ -21,8 +21,6 @@ from app.schemas.brainstorm import (
     BrainstormSessionResponse,
 )
 from app.services.brainstorming_service import BrainstormingService
-from app.services.agent_factory import AgentFactory
-from app.services.tools_service import ToolsService
 from app.services.codebase_exploration_service import CodebaseExplorationService
 
 logger = logging.getLogger(__name__)
@@ -387,17 +385,13 @@ async def websocket_brainstorm(
                 await websocket.close()
                 return
 
-            # Initialize services for dynamic tools
-            tools_service = ToolsService(db)
-            agent_factory = AgentFactory(db, tools_service)
-
             # Main message loop
             while True:
                 data = await websocket.receive_json()
                 logger.info(f"[WS] Received: {data['type']}")
 
                 if data["type"] == "user_message":
-                    await handle_user_message(websocket, db, session_id, data["content"], agent_factory)
+                    await handle_user_message(websocket, db, session_id, data["content"])
 
                 elif data["type"] == "interaction":
                     logger.info(f"[WS] Interaction data received: {data}")
@@ -415,7 +409,6 @@ async def websocket_brainstorm(
                     await handle_interaction(
                         websocket, db, session_id,
                         block_id, value,
-                        agent_factory
                     )
 
         except WebSocketDisconnect:
@@ -436,7 +429,6 @@ async def handle_user_message(
     db,
     session_id: str,
     content: str,
-    agent_factory: AgentFactory
 ):
     """Handle user text message."""
     # Save user message to database
@@ -470,8 +462,8 @@ async def handle_user_message(
         }
     })
 
-    # Stream Claude response with dynamic tools
-    await stream_claude_response(websocket, db, session_id, agent_factory)
+    # Stream Claude response
+    await stream_claude_response(websocket, db, session_id)
 
 
 async def handle_interaction(
@@ -480,7 +472,6 @@ async def handle_interaction(
     session_id: str,
     block_id: str,
     value: str | list[str],
-    agent_factory: AgentFactory
 ):
     """Handle user interaction with button/select."""
     # Save interaction as user message
@@ -515,8 +506,8 @@ async def handle_interaction(
         }
     })
 
-    # Stream Claude response with dynamic tools
-    await stream_claude_response(websocket, db, session_id, agent_factory)
+    # Stream Claude response
+    await stream_claude_response(websocket, db, session_id)
 
 
 async def auto_generate_session_metadata(db, session_id: str, messages: list):
@@ -572,7 +563,10 @@ async def auto_generate_session_metadata(db, session_id: str, messages: list):
 
     # Generate title and description using Claude
     try:
-        async with BrainstormingService(api_key=settings.anthropic_api_key) as service:
+        async with BrainstormingService(
+            api_key=settings.anthropic_api_key,
+            db=db
+        ) as service:
             prompt = f"""Based on this brainstorming conversation, generate a concise title (max 50 chars) and brief description (max 150 chars).
 
 Conversation:
@@ -605,7 +599,6 @@ async def stream_claude_response(
     websocket: WebSocket,
     db,
     session_id: str,
-    agent_factory: AgentFactory
 ):
     """Stream Claude's response block-by-block."""
     # Get conversation history
@@ -689,10 +682,10 @@ async def stream_claude_response(
     message_id = str(uuid4())
     collected_blocks = []
 
-    # Create service with agent factory
+    # Create service with database session for tool loading
     async with BrainstormingService(
         api_key=settings.anthropic_api_key,
-        agent_factory=agent_factory,
+        db=db,
         agent_name="brainstorm"
     ) as service:
         try:

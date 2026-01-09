@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -9,6 +10,19 @@ from app.api.webhooks import router as webhooks_router
 from app.api.brainstorms import router as brainstorms_router
 from app.api.ideas import router as ideas_router
 from app.tasks.polling_task import start_polling_scheduler, stop_polling_scheduler
+
+# Configure logging - silence SQLAlchemy completely
+logging.getLogger('sqlalchemy').setLevel(logging.ERROR)
+logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
+logging.getLogger('sqlalchemy.pool').setLevel(logging.ERROR)
+logging.getLogger('sqlalchemy.dialects').setLevel(logging.ERROR)
+logging.getLogger('sqlalchemy.orm').setLevel(logging.ERROR)
+
+# Confirm module load
+logger = logging.getLogger(__name__)
+logger.warning("="*60)
+logger.warning("🚀 MAIN.PY LOADED - VERSION 3.0")
+logger.warning("="*60)
 
 
 @asynccontextmanager

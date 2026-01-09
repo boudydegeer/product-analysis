@@ -23,8 +23,17 @@ from app.schemas.brainstorm import (
 from app.services.brainstorming_service import BrainstormingService
 
 logger = logging.getLogger(__name__)
+logger.warning("*" * 60)
+logger.warning("🔥 BRAINSTORMS.PY LOADED - VERSION 3.0 WITH FULL LOGGING")
+logger.warning("*" * 60)
 
 router = APIRouter(prefix="/api/v1/brainstorms", tags=["brainstorms"])
+
+
+@router.get("/debug/version")
+async def debug_version():
+    """Debug endpoint to check if code is loaded."""
+    return {"version": "2.0-WITH-LOGGING", "status": "active"}
 
 
 @router.post(
@@ -217,6 +226,12 @@ async def stream_brainstorm(
     Raises:
         HTTPException: If session not found or API key not configured
     """
+    # CRITICAL: This log MUST appear if function is called
+    logger.warning("=" * 80)
+    logger.warning(f"[ENDPOINT] ✨ STREAM ENDPOINT CALLED - SESSION: {session_id}")
+    logger.warning(f"[ENDPOINT] MESSAGE: {message[:100]}")
+    logger.warning("=" * 80)
+
     # Verify session exists
     result = await db.execute(
         select(BrainstormSession).where(BrainstormSession.id == session_id)
@@ -244,45 +259,87 @@ async def stream_brainstorm(
     )
     db.add(user_message)
     await db.commit()
+    logger.warning("[CHECKPOINT 1] User message saved to DB")
 
     # Build conversation history
     messages = [
         {"role": msg.role.value, "content": msg.content} for msg in session.messages
     ]
     messages.append({"role": "user", "content": message})
+    logger.warning(f"[CHECKPOINT 2] Built conversation history with {len(messages)} messages")
+
+    # Import async_session_maker at function level to ensure proper DB access
+    from app.database import async_session_maker
+    logger.warning("[CHECKPOINT 3] Imported async_session_maker")
 
     # Stream response
     async def event_generator():
+        logger.warning("[CHECKPOINT 4] Inside event_generator function")
         """Generate SSE events."""
         assistant_content = ""
+        assistant_saved = False
 
         try:
+            logger.warning(f"[CHECKPOINT 4.1] About to create BrainstormingService")
+            logger.warning(f"[CHECKPOINT 4.2] API key present: {bool(settings.anthropic_api_key)}")
+            logger.warning(f"[CHECKPOINT 4.3] Messages count: {len(messages)}")
+
             async with BrainstormingService(
                 api_key=settings.anthropic_api_key
             ) as brainstorm_service:
+                logger.warning(f"[CHECKPOINT 4.4] BrainstormingService context entered")
+                logger.warning(f"[CHECKPOINT 4.5] About to call stream_brainstorm_message")
+                chunk_count = 0
                 async for chunk in brainstorm_service.stream_brainstorm_message(
                     messages
                 ):
+                    chunk_count += 1
                     assistant_content += chunk
                     yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 
-            # Save assistant message
-            assistant_message = BrainstormMessage(
-                id=str(uuid4()),
-                session_id=session_id,
-                role=MessageRole.ASSISTANT,
-                content=assistant_content,
-            )
-            db.add(assistant_message)
-            await db.commit()
+            logger.info(f"[STREAM] Stream completed for session {session_id}, chunks: {chunk_count}, content length: {len(assistant_content)}")
 
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            # Save assistant message using a new database session
+            # The original db session is closed after the response is returned
+            if assistant_content:
+                async with async_session_maker() as save_db:
+                    try:
+                        assistant_message = BrainstormMessage(
+                            id=str(uuid4()),
+                            session_id=session_id,
+                            role=MessageRole.ASSISTANT,
+                            content=assistant_content,
+                        )
+                        save_db.add(assistant_message)
+                        await save_db.commit()
+                        assistant_saved = True
+                        logger.info(
+                            f"✓ Saved assistant message {assistant_message.id} for session {session_id}"
+                        )
+                    except Exception as save_error:
+                        logger.error(
+                            f"✗ Failed to save assistant message for session {session_id}: {save_error}",
+                            exc_info=True
+                        )
+                        await save_db.rollback()
+                        # Continue anyway to send 'done' event to frontend
+            else:
+                logger.warning(f"No assistant content to save for session {session_id}")
+
+            # Send done event with save status
+            yield f"data: {json.dumps({'type': 'done', 'saved': assistant_saved})}\n\n"
+            logger.info(f"Stream completed and done event sent for session {session_id}")
 
         except Exception as e:
-            logger.error(f"Error streaming brainstorm: {e}")
+            logger.error(f"[STREAM] ✗ Error streaming brainstorm for session {session_id}: {e}", exc_info=True)
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        finally:
+            logger.info(f"[STREAM] Event generator finished for session {session_id}")
 
-    return StreamingResponse(
+    logger.warning("[CHECKPOINT 5] About to return StreamingResponse")
+    logger.info(f"[STREAM] Returning StreamingResponse for session {session_id}")
+
+    response = StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={
@@ -290,3 +347,5 @@ async def stream_brainstorm(
             "Connection": "keep-alive",
         },
     )
+    logger.warning("[CHECKPOINT 6] StreamingResponse created, returning now")
+    return response

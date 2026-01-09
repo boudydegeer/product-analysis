@@ -1,24 +1,27 @@
 <template>
-  <div class="flex flex-col h-full">
-    <!-- Session Header -->
-    <div v-if="currentSession" class="border-b p-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-xl font-semibold">{{ currentSession.title }}</h2>
-          <p class="text-sm text-muted-foreground">
-            {{ currentSession.description }}
-          </p>
+  <div class="h-full grid grid-rows-[auto_1fr_auto] overflow-hidden">
+    <!-- Session Header - Fixed at top -->
+    <div v-if="currentSession" class="border-b px-4 py-3 bg-background">
+      <div class="flex items-start gap-3">
+        <Button variant="ghost" size="icon" @click="router.back()" class="shrink-0">
+          <ArrowLeft class="h-4 w-4" />
+        </Button>
+        <div class="flex-1 min-w-0">
+          <div class="flex flex-col items-baseline gap-2">
+            <h2 class="text-lg font-semibold truncate">{{ currentSession.title }}</h2>
+            <span class="text-sm text-muted-foreground truncate">{{ currentSession.description }}</span>
+          </div>
         </div>
-        <Badge :variant="getStatusVariant(currentSession.status)">
+        <Badge :variant="getStatusVariant(currentSession.status)" class="shrink-0">
           {{ currentSession.status }}
         </Badge>
       </div>
     </div>
 
-    <!-- Messages Container -->
+    <!-- Messages Container - Scrollable area -->
     <div
       ref="messagesContainer"
-      class="flex-1 overflow-y-auto p-4 space-y-4"
+      class="overflow-y-auto overflow-x-hidden p-4 space-y-4"
     >
       <!-- Messages -->
       <div
@@ -73,8 +76,8 @@
       </div>
     </div>
 
-    <!-- Input Form -->
-    <div class="border-t p-4">
+    <!-- Input Form - Fixed at bottom -->
+    <div class="border-t p-4 bg-background">
       <form @submit.prevent="handleSendMessage" class="flex gap-2">
         <Textarea
           v-model="userMessage"
@@ -101,23 +104,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { useBrainstormStore } from '@/stores/brainstorm'
 import { brainstormsApi } from '@/api/brainstorms'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Send } from 'lucide-vue-next'
+import { Send, ArrowLeft } from 'lucide-vue-next'
 import type { StreamChunk } from '@/types/brainstorm'
 
 const props = defineProps<{
   sessionId: string
 }>()
 
+const router = useRouter()
 const store = useBrainstormStore()
 const userMessage = ref('')
 const messagesContainer = ref<HTMLDivElement>()
+const currentEventSource = ref<EventSource | null>(null)
 
 const currentSession = computed(() => store.currentSession)
 const loading = computed(() => store.loading)
@@ -140,13 +146,30 @@ function getStatusVariant(status: string) {
   }
 }
 
+function cleanupEventSource() {
+  console.log('[FRONTEND] cleanupEventSource called')
+  if (currentEventSource.value) {
+    console.log('[FRONTEND] Closing EventSource')
+    currentEventSource.value.close()
+    currentEventSource.value = null
+  }
+  console.log('[FRONTEND] Setting streaming = false')
+  store.setStreaming(false)
+}
+
 async function handleSendMessage() {
-  if (!userMessage.value.trim() || !currentSession.value) return
+  console.log('[FRONTEND] handleSendMessage called')
+  if (!userMessage.value.trim() || !currentSession.value) {
+    console.log('[FRONTEND] Early return: empty message or no session')
+    return
+  }
 
   const message = userMessage.value
+  console.log('[FRONTEND] Message:', message, 'Session:', currentSession.value.id)
   userMessage.value = ''
 
   // Add user message to UI immediately
+  console.log('[FRONTEND] Adding user message to store')
   store.addMessage({
     id: crypto.randomUUID(),
     session_id: currentSession.value.id,
@@ -156,53 +179,77 @@ async function handleSendMessage() {
     updated_at: new Date().toISOString(),
   })
 
+  // Cleanup any existing connection
+  console.log('[FRONTEND] Cleaning up existing EventSource')
+  cleanupEventSource()
+
+  let eventSource: EventSource | null = null
+
   try {
+    console.log('[FRONTEND] Setting streaming = true')
     store.setStreaming(true)
     store.clearStreamingContent()
 
-    const eventSource = brainstormsApi.streamBrainstorm(
+    console.log('[FRONTEND] Creating EventSource...')
+    eventSource = brainstormsApi.streamBrainstorm(
       currentSession.value.id,
       message
     )
+    currentEventSource.value = eventSource
+    console.log('[FRONTEND] EventSource created, URL:', eventSource.url)
 
     eventSource.addEventListener('message', (event: MessageEvent) => {
-      const data: StreamChunk = JSON.parse(event.data)
+      console.log('[FRONTEND] Received SSE message:', event.data)
+      try {
+        const data: StreamChunk = JSON.parse(event.data)
+        console.log('[FRONTEND] Parsed data:', data)
 
-      if (data.type === 'chunk' && data.content) {
-        store.appendStreamingContent(data.content)
-        scrollToBottom()
-      } else if (data.type === 'done') {
-        eventSource.close()
+        if (data.type === 'chunk' && data.content) {
+          console.log('[FRONTEND] Chunk received, length:', data.content.length)
+          store.appendStreamingContent(data.content)
+          scrollToBottom()
+        } else if (data.type === 'done') {
+          console.log('[FRONTEND] Stream completed, adding assistant message')
 
-        // Add assistant message
-        if (streamingContent.value) {
-          store.addMessage({
-            id: crypto.randomUUID(),
-            session_id: currentSession.value!.id,
-            role: 'assistant',
-            content: streamingContent.value,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
+          // Add assistant message to UI
+          if (streamingContent.value) {
+            store.addMessage({
+              id: crypto.randomUUID(),
+              session_id: currentSession.value!.id,
+              role: 'assistant',
+              content: streamingContent.value,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+          }
+
+          // Clear streaming state and cleanup
+          store.clearStreamingContent()
+          cleanupEventSource()
+
+          console.log('Assistant message added, input should be re-enabled')
+        } else if (data.type === 'error') {
+          console.error('[FRONTEND] Streaming error from server:', data.message)
+          cleanupEventSource()
         }
-
-        store.setStreaming(false)
-        store.clearStreamingContent()
-      } else if (data.type === 'error') {
-        eventSource.close()
-        store.setStreaming(false)
-        console.error('Streaming error:', data.message)
+      } catch (parseError) {
+        console.error('[FRONTEND] Failed to parse SSE message:', parseError, 'Raw data:', event.data)
+        cleanupEventSource()
       }
     })
 
-    eventSource.addEventListener('error', () => {
-      eventSource.close()
-      store.setStreaming(false)
-      console.error('EventSource connection failed')
+    eventSource.addEventListener('error', (error) => {
+      console.error('[FRONTEND] EventSource connection failed:', error)
+      console.error('[FRONTEND] EventSource readyState:', eventSource?.readyState)
+      cleanupEventSource()
+    })
+
+    eventSource.addEventListener('open', () => {
+      console.log('[FRONTEND] EventSource connection opened successfully')
     })
   } catch (error) {
-    store.setStreaming(false)
-    console.error('Failed to send message:', error)
+    console.error('[FRONTEND] Failed to send message (caught exception):', error)
+    cleanupEventSource()
   }
 }
 
@@ -224,5 +271,11 @@ watch(
 onMounted(async () => {
   await store.fetchSession(props.sessionId)
   scrollToBottom()
+})
+
+onBeforeUnmount(() => {
+  // Cleanup EventSource when component is destroyed
+  cleanupEventSource()
+  store.clearStreamingContent()
 })
 </script>

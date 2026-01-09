@@ -9,7 +9,7 @@ from app.config import settings
 # Create async engine
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.debug,
+    echo=False,  # Disable SQL query logging (too verbose)
     pool_pre_ping=True,
 )
 

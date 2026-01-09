@@ -42,14 +42,13 @@ function toggleOption(value: string, checked: boolean) {
   if (interacting.value) return
 
   if (checked) {
+    // Add to selection - create new array to trigger reactivity
     if (!selected.value.includes(value)) {
-      selected.value.push(value)
+      selected.value = [...selected.value, value]
     }
   } else {
-    const index = selected.value.indexOf(value)
-    if (index !== -1) {
-      selected.value.splice(index, 1)
-    }
+    // Remove from selection - create new array to trigger reactivity
+    selected.value = selected.value.filter(v => v !== value)
   }
 
   console.log('[MultiSelectBlock] After toggle, selected:', selected.value)

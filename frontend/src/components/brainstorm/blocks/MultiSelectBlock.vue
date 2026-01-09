@@ -70,23 +70,23 @@ function toggleOption(value: string, checked: boolean | 'indeterminate') {
 
 <template>
   <div class="space-y-3">
-    <p class="text-sm font-medium">{{ block.label }}</p>
+    <p class="text-sm font-medium">{{ block.prompt }}</p>
     <div class="space-y-2">
       <div
         v-for="option in block.options"
-        :key="option.value"
+        :key="option.id"
         class="flex items-start gap-2 cursor-pointer hover:bg-accent/50 p-2 rounded-md transition-colors"
         :class="{ 'opacity-50 cursor-not-allowed': !interactive || interacting }"
-        @click="(!interactive || interacting) ? null : toggleOption(option.value, !isChecked(option.value))"
+        @click="(!interactive || interacting) ? null : toggleOption(option.id, !isChecked(option.id))"
       >
         <Checkbox
-          :id="option.value"
-          :model-value="isChecked(option.value)"
+          :id="option.id"
+          :model-value="isChecked(option.id)"
           :disabled="true"
           @click.stop.prevent
         />
         <div class="grid gap-1.5 leading-none flex-1">
-          <Label :for="option.value" class="text-sm font-normal">
+          <Label :for="option.id" class="text-sm font-normal">
             {{ option.label }}
           </Label>
           <p v-if="option.description" class="text-xs text-muted-foreground">

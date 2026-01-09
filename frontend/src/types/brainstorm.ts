@@ -29,14 +29,14 @@ export interface ButtonGroupBlock extends BaseBlock {
 }
 
 export interface SelectOption {
+  id: string
   label: string
-  value: string
   description?: string
 }
 
 export interface MultiSelectBlock extends BaseBlock {
   type: 'multi_select'
-  label: string
+  prompt: string
   options: SelectOption[]
   min?: number
   max?: number

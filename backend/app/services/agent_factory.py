@@ -60,11 +60,14 @@ class AgentFactory:
 
         logger.info(f"Creating SDK client for '{agent_type_name}' with {len(tools)} tools")
 
+        # Extract tool names for SDK (SDK expects list of strings, not full definitions)
+        tool_names = [tool["name"] for tool in tools] if tools else None
+
         # Build SDK options
         options = ClaudeAgentOptions(
             model=agent_config.model,
             system_prompt=agent_config.system_prompt,
-            tools=tools if tools else None,  # SDK requires None if no tools
+            tools=tool_names,  # SDK expects list of tool names (strings)
         )
 
         # Create and return client

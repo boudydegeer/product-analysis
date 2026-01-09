@@ -53,9 +53,9 @@ async def test_create_agent_client(db_session, monkeypatch):
     assert client.options.system_prompt == "Test prompt"
     assert len(client.options.tools) == 2
 
-    tool_names = [t["name"] for t in client.options.tools]
-    assert "tool1" in tool_names
-    assert "tool2" in tool_names
+    # Tools are now passed as list of names (strings), not full definitions
+    assert "tool1" in client.options.tools
+    assert "tool2" in client.options.tools
 
 
 @pytest.mark.asyncio

@@ -564,7 +564,11 @@ async def auto_generate_session_metadata(db, session_id: str, messages: list):
                         text_value = str(text_value)
                     conversation_summary.append(f"Assistant: {text_value[:200]}")
 
+    logger.warning(f"[WS] 🔍 Before conversation_summary join - type: {type(conversation_summary)}, length: {len(conversation_summary)}")
+    for i, part in enumerate(conversation_summary):
+        logger.warning(f"[WS] 🔍 conversation_summary[{i}] type={type(part)}, value={repr(part)[:200]}")
     conversation_text = "\n".join(conversation_summary)
+    logger.warning("[WS] Conversation summary joined successfully")
 
     # Generate title and description using Claude
     try:
@@ -612,13 +616,19 @@ async def stream_claude_response(
     )
     messages = result.scalars().all()
 
+    logger.warning(f"[WS] 🔍 Retrieved {len(messages)} messages from DB")
+    for i, msg in enumerate(messages):
+        logger.warning(f"[WS] 🔍 Message {i}: role={msg.role}, content type={type(msg.content)}, content={repr(msg.content)[:300]}")
+
     # Convert to format for Claude
     conversation = []
     for msg in messages:
         if msg.role == "user":
             # Extract text from blocks
             text_parts = []
-            for block in msg.content.get("blocks", []):
+            logger.warning(f"[WS] 🔍 Processing user message with {len(msg.content.get('blocks', []))} blocks")
+            for i, block in enumerate(msg.content.get("blocks", [])):
+                logger.warning(f"[WS] 🔍 Block {i}: type={block.get('type')}, keys={list(block.keys())}, full={repr(block)[:200]}")
                 if block["type"] == "text":
                     # Defensive: ensure text is a string
                     text_value = block.get("text", "")
@@ -630,12 +640,29 @@ async def stream_claude_response(
                         text_value = str(text_value)
                     text_parts.append(text_value)
                 elif block["type"] == "interaction_response":
-                    text_parts.append(f"Selected: {block['value']}")
-            conversation.append({"role": "user", "content": " ".join(text_parts)})
+                    value = block.get('value', '')
+                    # Ensure value is a string
+                    if isinstance(value, list):
+                        value = ', '.join(str(v) for v in value)
+                    elif not isinstance(value, str):
+                        value = str(value)
+                    text_parts.append(f"Selected: {value}")
+
+            # Final safety check: ensure all items in text_parts are strings
+            logger.warning(f"[WS] 🔍 Before user text_parts join - type: {type(text_parts)}, length: {len(text_parts)}")
+            for i, part in enumerate(text_parts):
+                logger.warning(f"[WS] 🔍 text_parts[{i}] type={type(part)}, value={repr(part)[:200]}")
+            text_parts = [str(part) if not isinstance(part, str) else part for part in text_parts]
+            logger.warning(f"[WS] 🔍 After conversion - text_parts types: {[type(p) for p in text_parts]}")
+            joined_content = " ".join(text_parts)
+            logger.warning(f"[WS] ✅ User content joined successfully: {joined_content[:100]}")
+            conversation.append({"role": "user", "content": joined_content})
         else:
             # For assistant, combine all text blocks
             text_parts = []
-            for b in msg.content.get("blocks", []):
+            logger.warning(f"[WS] 🔍 Processing assistant message with {len(msg.content.get('blocks', []))} blocks")
+            for i, b in enumerate(msg.content.get("blocks", [])):
+                logger.warning(f"[WS] 🔍 Block {i}: type={b.get('type')}, keys={list(b.keys())}, full={repr(b)[:200]}")
                 if b["type"] == "text" and "text" in b:
                     # Defensive: ensure text is a string
                     text_value = b.get("text", "")
@@ -646,8 +673,17 @@ async def stream_claude_response(
                         logger.warning(f"[WS] Assistant message block has non-string text: {type(text_value)}")
                         text_value = str(text_value)
                     text_parts.append(text_value)
+
+            # Final safety check: ensure all items in text_parts are strings
+            logger.warning(f"[WS] 🔍 Before assistant text_parts join - type: {type(text_parts)}, length: {len(text_parts)}")
+            for i, part in enumerate(text_parts):
+                logger.warning(f"[WS] 🔍 text_parts[{i}] type={type(part)}, value={repr(part)[:200]}")
+            text_parts = [str(part) if not isinstance(part, str) else part for part in text_parts]
+            logger.warning(f"[WS] 🔍 After conversion - text_parts types: {[type(p) for p in text_parts]}")
             if text_parts:
-                conversation.append({"role": "assistant", "content": " ".join(text_parts)})
+                joined_content = " ".join(text_parts)
+                logger.warning(f"[WS] ✅ Assistant content joined successfully: {joined_content[:100]}")
+                conversation.append({"role": "assistant", "content": joined_content})
 
     # Stream from Claude
     message_id = str(uuid4())
@@ -660,10 +696,70 @@ async def stream_claude_response(
         agent_name="brainstorm"
     ) as service:
         try:
-            # Claude returns JSON string
+            # Use the new stream_with_tool_detection for tool handling
             full_response = ""
-            async for chunk in service.stream_brainstorm_message(conversation):
-                full_response += chunk
+
+            async for chunk in service.stream_with_tool_detection(conversation):
+                if chunk.type == "text" and chunk.content:
+                    full_response += chunk.content
+                elif chunk.type == "tool_use" and chunk.tool_use:
+                    # Claude wants to use a tool
+                    tool_req = chunk.tool_use
+                    logger.warning(
+                        f"[WS] Tool use detected: {tool_req.tool_name}, "
+                        f"id={tool_req.tool_id}, input={tool_req.tool_input}"
+                    )
+
+                    if tool_req.tool_name == "explore_codebase":
+
+                        # Notify frontend about tool execution
+                        await websocket.send_json({
+                            "type": "tool_executing",
+                            "tool_name": "explore_codebase",
+                            "tool_id": tool_req.tool_id,
+                            "status": "started",
+                            "message": "Investigating codebase..."
+                        })
+
+                        # Execute the tool
+                        tool_result = await handle_tool_call(
+                            tool_name=tool_req.tool_name,
+                            tool_input=tool_req.tool_input,
+                            session_id=session_id,
+                            message_id=message_id,
+                            db=db,
+                            websocket=websocket
+                        )
+
+                        logger.warning(f"[WS] Tool result: {tool_result}")
+
+                        # Continue conversation with tool result
+                        # Note: For async tools like explore_codebase, the result
+                        # contains exploration_id and status, not actual findings.
+                        # The actual results come via webhook/polling later.
+                        # For now, we'll inform Claude about the initiated exploration.
+
+                        tool_continuation = ""
+                        async for cont_chunk in service.continue_with_tool_result(
+                            tool_id=tool_req.tool_id,
+                            tool_result=tool_result
+                        ):
+                            if cont_chunk.type == "text" and cont_chunk.content:
+                                tool_continuation += cont_chunk.content
+                            elif cont_chunk.type == "tool_use":
+                                # Nested tool use - log but don't handle recursively for now
+                                logger.warning(
+                                    f"[WS] Nested tool use detected: {cont_chunk.tool_use}"
+                                )
+
+                        if tool_continuation:
+                            full_response = tool_continuation
+                    else:
+                        logger.warning(f"[WS] Unknown tool: {tool_req.tool_name}")
+
+                elif chunk.type == "complete":
+                    logger.info("[WS] Stream complete signal received")
+                    break
 
             # Parse JSON response
             response_data = None

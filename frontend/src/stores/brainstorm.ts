@@ -5,7 +5,8 @@ import type {
   BrainstormSession,
   BrainstormSessionCreate,
   BrainstormSessionUpdate,
-  BrainstormMessage,
+  Message,
+  Block,
 } from '@/types/brainstorm'
 
 export const useBrainstormStore = defineStore('brainstorm', () => {
@@ -13,12 +14,18 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
   const currentSession = ref<BrainstormSession | null>(null)
   const sessions = ref<BrainstormSession[]>([])
   const loading = ref(false)
-  const streaming = ref(false)
   const error = ref<string | null>(null)
-  const streamingContent = ref('')
+
+  // WebSocket state
+  const wsConnected = ref(false)
+  const streamingMessageId = ref<string | null>(null)
+  const pendingBlocks = ref<Block[]>([])
+  const interactiveElementsActive = ref(false)
 
   // Getters
-  const isActive = computed(() => currentSession.value?.status === 'active')
+  const isActive = computed(
+    () => currentSession.value?.status === 'active' && wsConnected.value
+  )
 
   // Actions
   async function createSession(data: BrainstormSessionCreate) {
@@ -119,25 +126,65 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
     }
   }
 
-  function setStreaming(value: boolean) {
-    streaming.value = value
-  }
-
-  function setStreamingContent(content: string) {
-    streamingContent.value = content
-  }
-
-  function appendStreamingContent(chunk: string) {
-    streamingContent.value += chunk
-  }
-
-  function clearStreamingContent() {
-    streamingContent.value = ''
-  }
-
-  function addMessage(message: BrainstormMessage) {
+  // WebSocket actions
+  function addMessage(message: Message) {
     if (currentSession.value) {
       currentSession.value.messages.push(message)
+    }
+  }
+
+  function startStreamingMessage(messageId: string) {
+    streamingMessageId.value = messageId
+    pendingBlocks.value = []
+    interactiveElementsActive.value = false
+  }
+
+  function appendBlock(block: Block) {
+    pendingBlocks.value.push(block)
+
+    // Check if this is an interactive block
+    if (block.type === 'button_group' || block.type === 'multi_select') {
+      interactiveElementsActive.value = true
+    }
+  }
+
+  function completeStreamingMessage() {
+    if (!streamingMessageId.value || !currentSession.value) {
+      return
+    }
+
+    // Create the complete message
+    const message: Message = {
+      id: streamingMessageId.value,
+      session_id: currentSession.value.id,
+      role: 'assistant',
+      content: {
+        blocks: [...pendingBlocks.value],
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    // Add to session messages
+    addMessage(message)
+
+    // Clear streaming state
+    streamingMessageId.value = null
+    pendingBlocks.value = []
+  }
+
+  function clearInteractiveState() {
+    interactiveElementsActive.value = false
+  }
+
+  function setWsConnected(connected: boolean) {
+    wsConnected.value = connected
+
+    // Clear streaming state if disconnected
+    if (!connected) {
+      streamingMessageId.value = null
+      pendingBlocks.value = []
+      interactiveElementsActive.value = false
     }
   }
 
@@ -150,9 +197,11 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
     currentSession,
     sessions,
     loading,
-    streaming,
     error,
-    streamingContent,
+    wsConnected,
+    streamingMessageId,
+    pendingBlocks,
+    interactiveElementsActive,
     // Getters
     isActive,
     // Actions
@@ -161,11 +210,12 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
     fetchSession,
     updateSession,
     deleteSession,
-    setStreaming,
-    setStreamingContent,
-    appendStreamingContent,
-    clearStreamingContent,
     addMessage,
+    startStreamingMessage,
+    appendBlock,
+    completeStreamingMessage,
+    clearInteractiveState,
+    setWsConnected,
     clearError,
   }
 })

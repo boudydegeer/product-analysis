@@ -1,5 +1,6 @@
 """Brainstorm session and message schemas."""
 from datetime import datetime
+from typing import Any
 from pydantic import BaseModel, Field
 
 
@@ -24,7 +25,7 @@ class BrainstormMessageResponse(BaseModel):
     id: str
     session_id: str
     role: str
-    content: str
+    content: dict[str, Any]  # Changed from str to dict to match JSONB content with blocks
     created_at: datetime
     updated_at: datetime
 
@@ -48,4 +49,4 @@ class BrainstormSessionResponse(BaseModel):
 class BrainstormMessageCreate(BaseModel):
     """Schema for creating a brainstorm message."""
 
-    content: str = Field(..., min_length=1)
+    content: dict[str, Any] = Field(..., description="Message content with blocks structure")

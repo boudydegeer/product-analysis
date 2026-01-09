@@ -68,8 +68,8 @@
         </div>
       </div>
 
-      <!-- Streaming Message -->
-      <div v-if="store.streamingMessageId" class="flex justify-start">
+      <!-- Streaming Message or Waiting for Response -->
+      <div v-if="store.streamingMessageId || waitingForResponse" class="flex justify-start">
         <div class="max-w-[80%] rounded-lg p-4 bg-muted">
           <div class="flex items-center gap-2 mb-2">
             <Avatar class="h-6 w-6">
@@ -166,6 +166,7 @@ const userMessage = ref('')
 const messagesContainer = ref<HTMLDivElement>()
 const messageInput = ref<HTMLTextAreaElement>()
 const ws = ref<WebSocket | null>(null)
+const waitingForResponse = ref(false)
 
 const currentSession = computed(() => store.currentSession)
 const loading = computed(() => store.loading)
@@ -252,6 +253,9 @@ function handleServerMessage(data: WSServerMessage) {
     case 'stream_chunk':
       console.log('[WS] Stream chunk received for message:', data.message_id)
 
+      // Clear waiting state when first block arrives
+      waitingForResponse.value = false
+
       // Start streaming if not already started
       if (!store.streamingMessageId) {
         store.startStreamingMessage(data.message_id)
@@ -264,12 +268,14 @@ function handleServerMessage(data: WSServerMessage) {
 
     case 'stream_complete':
       console.log('[WS] Stream complete for message:', data.message_id)
+      waitingForResponse.value = false
       store.completeStreamingMessage()
       scrollToBottom()
       break
 
     case 'error':
       console.error('[WS] Server error:', data.message)
+      waitingForResponse.value = false
       store.clearInteractiveState()
       break
 
@@ -316,6 +322,9 @@ function handleSendMessage() {
   ws.value.send(JSON.stringify(wsMessage))
   userMessage.value = ''
 
+  // Set waiting state
+  waitingForResponse.value = true
+
   // Clear interactive state since we're sending a new message
   store.clearInteractiveState()
   scrollToBottom()
@@ -336,6 +345,9 @@ function handleInteraction(blockId: string, value: string | string[]) {
   }
 
   ws.value.send(JSON.stringify(interaction))
+
+  // Set waiting state
+  waitingForResponse.value = true
 
   // Clear interactive state since we've responded
   store.clearInteractiveState()

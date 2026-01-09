@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ButtonGroupBlock } from '@/types/brainstorm'
 
 const props = defineProps<{
@@ -49,11 +50,20 @@ function handleSkip() {
         {{ button.label }}
       </Button>
     </div>
-    <div v-if="interactive && !interacting" class="flex justify-end">
-      <Button variant="ghost" size="sm" @click="handleSkip">
-        Skip
-      </Button>
-    </div>
+    <TooltipProvider v-if="interactive && !interacting">
+      <div class="flex justify-between">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="ghost" size="sm" @click="handleSkip">
+              Skip
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Skip to respond with your own text</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
     <div v-if="interacting" class="text-sm text-muted-foreground">
       Sending...
     </div>

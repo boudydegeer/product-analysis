@@ -43,8 +43,8 @@
           <div class="flex items-center gap-2 mb-2">
             <Avatar class="h-6 w-6">
               <AvatarFallback>
-                <template v-if="message.role === 'user'">You</template>
-                <Bot v-else class="h-4 w-4" />
+                <User v-if="message.role === 'user'" class="h-5 w-5" />
+                <Bot v-else class="h-5 w-5" />
               </AvatarFallback>
             </Avatar>
             <span class="text-xs font-semibold">
@@ -74,7 +74,7 @@
           <div class="flex items-center gap-2 mb-2">
             <Avatar class="h-6 w-6">
               <AvatarFallback>
-                <Bot class="h-4 w-4" />
+                <Bot class="h-5 w-5" />
               </AvatarFallback>
             </Avatar>
             <span class="text-xs font-semibold">Claude</span>
@@ -143,7 +143,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Send, ArrowLeft, Bot } from 'lucide-vue-next'
+import { Send, ArrowLeft, Bot, User } from 'lucide-vue-next'
 import type { Block, WSServerMessage, WSUserMessage, WSInteraction, MessageContent } from '@/types/brainstorm'
 import TextBlock from '@/components/brainstorm/blocks/TextBlock.vue'
 import ButtonGroupBlock from '@/components/brainstorm/blocks/ButtonGroupBlock.vue'

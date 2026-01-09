@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { MultiSelectBlock } from '@/types/brainstorm'
 
 const props = defineProps<{
@@ -29,15 +30,29 @@ function handleSkip() {
   emit('skip')
 }
 
-function toggleOption(value: string) {
+function toggleOption(value: string, checked: boolean) {
+  console.log('[MultiSelectBlock] toggleOption called:', {
+    value,
+    checked,
+    interactive: props.interactive,
+    interacting: interacting.value,
+    currentSelected: selected.value
+  })
+
   if (interacting.value) return
 
-  const index = selected.value.indexOf(value)
-  if (index === -1) {
-    selected.value.push(value)
+  if (checked) {
+    if (!selected.value.includes(value)) {
+      selected.value.push(value)
+    }
   } else {
-    selected.value.splice(index, 1)
+    const index = selected.value.indexOf(value)
+    if (index !== -1) {
+      selected.value.splice(index, 1)
+    }
   }
+
+  console.log('[MultiSelectBlock] After toggle, selected:', selected.value)
 }
 </script>
 
@@ -50,7 +65,7 @@ function toggleOption(value: string) {
           :id="option.value"
           :checked="selected.includes(option.value)"
           :disabled="!interactive || interacting"
-          @update:checked="toggleOption(option.value)"
+          @update:checked="(checked: boolean) => toggleOption(option.value, checked)"
         />
         <div class="grid gap-1.5 leading-none">
           <Label :for="option.value" class="text-sm font-normal cursor-pointer">
@@ -62,23 +77,28 @@ function toggleOption(value: string) {
         </div>
       </div>
     </div>
-    <div class="flex items-center justify-between">
-      <Button
-        size="sm"
-        :disabled="!interactive || selected.length === 0 || interacting"
-        @click="handleSubmit"
-      >
-        Submit ({{ selected.length }} selected)
-      </Button>
-      <Button
-        v-if="interactive && !interacting"
-        variant="ghost"
-        size="sm"
-        @click="handleSkip"
-      >
-        Skip
-      </Button>
-    </div>
+    <TooltipProvider v-if="interactive && !interacting">
+      <div class="flex justify-between items-center">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="ghost" size="sm" @click="handleSkip">
+              Skip
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Skip to respond with your own text</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Button
+          size="sm"
+          :disabled="!interactive || selected.length === 0 || interacting"
+          @click="handleSubmit"
+        >
+          Submit ({{ selected.length }} selected)
+        </Button>
+      </div>
+    </TooltipProvider>
     <div v-if="interacting" class="text-sm text-muted-foreground">
       Sending...
     </div>

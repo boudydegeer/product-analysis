@@ -11,6 +11,8 @@ from app.models.feature import Feature  # noqa: F401
 from app.models.analysis import Analysis  # noqa: F401
 from app.models.idea import Idea  # noqa: F401
 from app.models.brainstorm import BrainstormSession, BrainstormMessage  # noqa: F401
+from app.models.tool import Tool  # noqa: F401
+from app.models.agent import AgentType, AgentToolConfig, ToolUsageAudit  # noqa: F401
 
 
 # Test database URL
@@ -76,6 +78,7 @@ async def test_app(test_db):
     from app.api.brainstorms import router as brainstorms_router
     from app.api.ideas import router as ideas_router
     from app.api.agents import router as agents_router
+    from app.api.tools import router as tools_router
     from app.config import settings
 
     # Create a test app without lifespan to avoid starting scheduler
@@ -85,6 +88,7 @@ async def test_app(test_db):
     app.include_router(brainstorms_router)
     app.include_router(ideas_router)
     app.include_router(agents_router)
+    app.include_router(tools_router)
 
     # Add health endpoint for tests
     @app.get("/health")

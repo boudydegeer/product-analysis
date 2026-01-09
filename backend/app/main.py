@@ -10,6 +10,8 @@ from app.api.webhooks import router as webhooks_router
 from app.api.brainstorms import router as brainstorms_router
 from app.api.ideas import router as ideas_router
 from app.api.agents import router as agents_router
+from app.api.tools import router as tools_router
+from app.api.admin import router as admin_router
 from app.tasks.polling_task import start_polling_scheduler, stop_polling_scheduler
 
 # Configure logging - silence SQLAlchemy completely
@@ -60,6 +62,8 @@ app.include_router(webhooks_router)
 app.include_router(brainstorms_router)
 app.include_router(ideas_router)
 app.include_router(agents_router)
+app.include_router(tools_router)
+app.include_router(admin_router)
 
 
 @app.get("/")

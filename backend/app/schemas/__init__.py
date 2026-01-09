@@ -22,6 +22,18 @@ from app.schemas.idea import (
     IdeaEvaluationRequest,
     IdeaEvaluationResponse,
 )
+from app.schemas.agent import (
+    AgentBase,
+    AgentCreate,
+    AgentUpdate,
+    AgentResponse,
+    ToolAssignmentConfig,
+)
+from app.schemas.tool import (
+    ToolCreate,
+    ToolUpdate,
+    ToolResponse,
+)
 
 __all__ = [
     "FeatureBase",
@@ -40,4 +52,12 @@ __all__ = [
     "IdeaResponse",
     "IdeaEvaluationRequest",
     "IdeaEvaluationResponse",
+    "AgentBase",
+    "AgentCreate",
+    "AgentUpdate",
+    "AgentResponse",
+    "ToolAssignmentConfig",
+    "ToolCreate",
+    "ToolUpdate",
+    "ToolResponse",
 ]

@@ -2,13 +2,13 @@
 import json
 import logging
 from uuid import uuid4
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database import get_db
+from app.database import get_db, async_session_maker
 from app.models.brainstorm import (
     BrainstormSession,
     BrainstormSessionStatus,
@@ -349,3 +349,225 @@ async def stream_brainstorm(
     )
     logger.warning("[CHECKPOINT 6] StreamingResponse created, returning now")
     return response
+
+
+@router.websocket("/ws/{session_id}")
+async def websocket_brainstorm(
+    websocket: WebSocket,
+    session_id: str,
+):
+    """WebSocket endpoint for interactive brainstorming."""
+    await websocket.accept()
+    logger.info(f"[WS] Client connected to session {session_id}")
+
+    # Independent database session
+    async with async_session_maker() as db:
+        try:
+            # Verify session exists and is active
+            result = await db.execute(
+                select(BrainstormSession).where(BrainstormSession.id == session_id)
+            )
+            session = result.scalar_one_or_none()
+
+            if not session:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Session not found"
+                })
+                await websocket.close()
+                return
+
+            if session.status != "active":
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Session is not active"
+                })
+                await websocket.close()
+                return
+
+            # Main message loop
+            while True:
+                data = await websocket.receive_json()
+                logger.info(f"[WS] Received: {data['type']}")
+
+                if data["type"] == "user_message":
+                    await handle_user_message(websocket, db, session_id, data["content"])
+
+                elif data["type"] == "interaction":
+                    await handle_interaction(
+                        websocket, db, session_id,
+                        data["block_id"], data["value"]
+                    )
+
+        except WebSocketDisconnect:
+            logger.info(f"[WS] Client disconnected from session {session_id}")
+        except Exception as e:
+            logger.error(f"[WS] Error: {e}", exc_info=True)
+            try:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": str(e)
+                })
+            except:
+                pass
+
+
+async def handle_user_message(
+    websocket: WebSocket,
+    db,
+    session_id: str,
+    content: str
+):
+    """Handle user text message."""
+    # Save user message to database
+    user_message = BrainstormMessage(
+        id=str(uuid4()),
+        session_id=session_id,
+        role="user",
+        content={
+            "blocks": [{
+                "id": str(uuid4()),
+                "type": "text",
+                "text": content
+            }]
+        }
+    )
+    db.add(user_message)
+    await db.commit()
+    logger.info(f"[WS] Saved user message")
+
+    # Stream Claude response
+    await stream_claude_response(websocket, db, session_id)
+
+
+async def handle_interaction(
+    websocket: WebSocket,
+    db,
+    session_id: str,
+    block_id: str,
+    value: str | list[str]
+):
+    """Handle user interaction with button/select."""
+    # Save interaction as user message
+    interaction_message = BrainstormMessage(
+        id=str(uuid4()),
+        session_id=session_id,
+        role="user",
+        content={
+            "blocks": [{
+                "id": str(uuid4()),
+                "type": "interaction_response",
+                "block_id": block_id,
+                "value": value
+            }]
+        }
+    )
+    db.add(interaction_message)
+    await db.commit()
+    logger.info(f"[WS] Saved interaction")
+
+    # Stream Claude response
+    await stream_claude_response(websocket, db, session_id)
+
+
+async def stream_claude_response(
+    websocket: WebSocket,
+    db,
+    session_id: str
+):
+    """Stream Claude's response block-by-block."""
+    # Get conversation history
+    result = await db.execute(
+        select(BrainstormMessage)
+        .where(BrainstormMessage.session_id == session_id)
+        .order_by(BrainstormMessage.created_at)
+    )
+    messages = result.scalars().all()
+
+    # Convert to format for Claude
+    conversation = []
+    for msg in messages:
+        if msg.role == "user":
+            # Extract text from blocks
+            text_parts = []
+            for block in msg.content.get("blocks", []):
+                if block["type"] == "text":
+                    text_parts.append(block["text"])
+                elif block["type"] == "interaction_response":
+                    text_parts.append(f"Selected: {block['value']}")
+            conversation.append({"role": "user", "content": " ".join(text_parts)})
+        else:
+            # For assistant, combine all text blocks
+            text_parts = [
+                b["text"] for b in msg.content.get("blocks", [])
+                if b["type"] == "text"
+            ]
+            if text_parts:
+                conversation.append({"role": "assistant", "content": " ".join(text_parts)})
+
+    # Stream from Claude
+    message_id = str(uuid4())
+    collected_blocks = []
+
+    async with BrainstormingService(api_key=settings.anthropic_api_key) as service:
+        try:
+            # Claude returns JSON string
+            full_response = ""
+            async for chunk in service.stream_brainstorm_message(conversation):
+                full_response += chunk
+
+            # Parse JSON response
+            try:
+                response_data = json.loads(full_response)
+                blocks = response_data.get("blocks", [])
+
+                # Send blocks incrementally
+                for block in blocks:
+                    await websocket.send_json({
+                        "type": "stream_chunk",
+                        "message_id": message_id,
+                        "block": block
+                    })
+                    collected_blocks.append(block)
+
+            except json.JSONDecodeError:
+                # Fallback: treat as plain text
+                logger.warning("[WS] Claude response not valid JSON, treating as text")
+                text_block = {
+                    "id": str(uuid4()),
+                    "type": "text",
+                    "text": full_response
+                }
+                await websocket.send_json({
+                    "type": "stream_chunk",
+                    "message_id": message_id,
+                    "block": text_block
+                })
+                collected_blocks.append(text_block)
+
+            # Save to database
+            assistant_message = BrainstormMessage(
+                id=message_id,
+                session_id=session_id,
+                role="assistant",
+                content={
+                    "blocks": collected_blocks,
+                    "metadata": response_data.get("metadata", {}) if isinstance(response_data, dict) else {}
+                }
+            )
+            db.add(assistant_message)
+            await db.commit()
+
+            # Signal completion
+            await websocket.send_json({
+                "type": "stream_complete",
+                "message_id": message_id
+            })
+            logger.info(f"[WS] Stream complete")
+
+        except Exception as e:
+            logger.error(f"[WS] Error streaming: {e}", exc_info=True)
+            await websocket.send_json({
+                "type": "error",
+                "message": f"Streaming error: {str(e)}"
+            })

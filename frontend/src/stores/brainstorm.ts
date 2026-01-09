@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { brainstormsApi } from '@/api/brainstorms'
+import { getAgentConfig } from '@/api/agents'
 import type {
   BrainstormSession,
   BrainstormSessionCreate,
@@ -8,6 +9,7 @@ import type {
   Message,
   Block,
 } from '@/types/brainstorm'
+import type { AgentType } from '@/types/agent'
 
 export const useBrainstormStore = defineStore('brainstorm', () => {
   // State
@@ -15,6 +17,10 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
   const sessions = ref<BrainstormSession[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+
+  // Agent config state
+  const currentAgentConfig = ref<AgentType | null>(null)
+  const agentConfigLoading = ref(false)
 
   // WebSocket state
   const wsConnected = ref(false)
@@ -203,12 +209,36 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
     error.value = null
   }
 
+  async function fetchAgentConfig(agentName: string) {
+    agentConfigLoading.value = true
+    try {
+      currentAgentConfig.value = await getAgentConfig(agentName)
+    } catch (error) {
+      console.error('[STORE] Failed to fetch agent config:', error)
+      // Use default fallback
+      currentAgentConfig.value = {
+        id: 0,
+        name: agentName,
+        display_name: 'Claude',
+        avatar_url: '🤖',
+        avatar_color: '#6366f1',
+        personality_traits: [],
+        model: 'claude-sonnet-4-5',
+        temperature: 0.7,
+      }
+    } finally {
+      agentConfigLoading.value = false
+    }
+  }
+
   return {
     // State
     currentSession,
     sessions,
     loading,
     error,
+    currentAgentConfig,
+    agentConfigLoading,
     wsConnected,
     streamingMessageId,
     pendingBlocks,
@@ -228,5 +258,6 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
     clearInteractiveState,
     setWsConnected,
     clearError,
+    fetchAgentConfig,
   }
 })

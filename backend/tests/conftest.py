@@ -75,6 +75,7 @@ async def test_app(test_db):
     from app.api.webhooks import router as webhooks_router
     from app.api.brainstorms import router as brainstorms_router
     from app.api.ideas import router as ideas_router
+    from app.api.agents import router as agents_router
     from app.config import settings
 
     # Create a test app without lifespan to avoid starting scheduler
@@ -83,6 +84,7 @@ async def test_app(test_db):
     app.include_router(webhooks_router)
     app.include_router(brainstorms_router)
     app.include_router(ideas_router)
+    app.include_router(agents_router)
 
     # Add health endpoint for tests
     @app.get("/health")

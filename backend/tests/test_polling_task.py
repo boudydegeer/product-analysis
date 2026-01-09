@@ -5,7 +5,6 @@ from app.tasks.polling_task import (
     poll_analyzing_features,
     start_polling_scheduler,
     stop_polling_scheduler,
-    scheduler,
 )
 
 

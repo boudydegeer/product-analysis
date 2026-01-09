@@ -174,50 +174,91 @@ jobs:
               console.log('\n\n---');
               console.log('Claude Agent SDK exploration complete');
 
-              let explorationResult;
+              let explorationResult = null;
               const contentToAnalyze = resultContent || fullOutput;
 
+              // Method 1: Try to parse the whole response as JSON (ideal case)
               try {
-                const jsonMatch = contentToAnalyze.match(/\{[\s\S]*\}/);
-                if (jsonMatch) {
-                  explorationResult = JSON.parse(jsonMatch[0]);
-                  console.log('Successfully parsed structured JSON output');
-                } else {
-                  console.warn('Could not find JSON in output, wrapping raw output');
-                  explorationResult = {
-                    exploration_id: explorationId,
-                    query: userQuery,
-                    status: 'completed',
-                    results: {
-                      summary: contentToAnalyze.substring(0, 500),
-                      relevant_files: [],
-                      key_patterns: [],
-                      code_examples: [],
-                      architecture_notes: '',
-                      recommendations: [],
-                      confidence: 'medium',
-                      raw_response: contentToAnalyze
-                    },
-                    error: 'Could not parse structured JSON from Claude response'
-                  };
+                explorationResult = JSON.parse(contentToAnalyze.trim());
+                console.log('Successfully parsed entire response as JSON (Method 1)');
+              } catch (e1) {
+                console.log('Method 1 failed (whole response): ' + e1.message);
+
+                // Method 2: Extract from markdown code block ```json ... ``` or ``` ... ```
+                const codeBlockMatch = contentToAnalyze.match(/```(?:json)?\s*([\s\S]*?)```/);
+                if (codeBlockMatch) {
+                  try {
+                    explorationResult = JSON.parse(codeBlockMatch[1].trim());
+                    console.log('Successfully parsed JSON from markdown code block (Method 2)');
+                  } catch (e2) {
+                    console.log('Method 2 failed (code block): ' + e2.message);
+                  }
                 }
-              } catch (parseError) {
-                console.error('Failed to parse JSON:', parseError.message);
+
+                // Method 3: Find and extract JSON object by matching braces
+                if (!explorationResult) {
+                  console.log('Attempting Method 3: brace matching...');
+                  const firstBrace = contentToAnalyze.indexOf('{');
+                  if (firstBrace !== -1) {
+                    let depth = 0;
+                    let start = -1;
+                    let end = -1;
+                    for (let i = firstBrace; i < contentToAnalyze.length; i++) {
+                      if (contentToAnalyze[i] === '{') {
+                        if (depth === 0) start = i;
+                        depth++;
+                      } else if (contentToAnalyze[i] === '}') {
+                        depth--;
+                        if (depth === 0) {
+                          end = i + 1;
+                          break;
+                        }
+                      }
+                    }
+                    if (start !== -1 && end !== -1) {
+                      try {
+                        explorationResult = JSON.parse(contentToAnalyze.slice(start, end));
+                        console.log('Successfully parsed JSON via brace matching (Method 3)');
+                      } catch (e3) {
+                        console.log('Method 3 failed (brace matching): ' + e3.message);
+                      }
+                    }
+                  }
+                }
+
+                // Method 4: Simple regex for JSON object containing exploration_id
+                if (!explorationResult) {
+                  console.log('Attempting Method 4: regex extraction...');
+                  const jsonMatch = contentToAnalyze.match(/\{[\s\S]*"exploration_id"[\s\S]*\}/);
+                  if (jsonMatch) {
+                    try {
+                      explorationResult = JSON.parse(jsonMatch[0]);
+                      console.log('Successfully parsed JSON via regex (Method 4)');
+                    } catch (e4) {
+                      console.log('Method 4 failed (regex): ' + e4.message);
+                    }
+                  }
+                }
+              }
+
+              // If all parsing methods failed, create a structured result from raw response
+              if (!explorationResult) {
+                console.warn('All JSON parsing methods failed, creating structured result from raw response');
                 explorationResult = {
                   exploration_id: explorationId,
                   query: userQuery,
                   status: 'completed',
                   results: {
-                    summary: contentToAnalyze.substring(0, 500),
+                    summary: contentToAnalyze.substring(0, 2000),
                     relevant_files: [],
                     key_patterns: [],
                     code_examples: [],
-                    architecture_notes: '',
+                    architecture_notes: contentToAnalyze,
                     recommendations: [],
                     confidence: 'low',
                     raw_response: contentToAnalyze
                   },
-                  error: parseError.message
+                  parsing_error: 'Could not extract structured JSON from Claude response. Raw response preserved in results.raw_response and results.architecture_notes.'
                 };
               }
 
@@ -396,6 +437,9 @@ jobs:
             - Provide actionable insights with specific file references
             - If you can't find something, say so rather than guessing
             - Use Markdown formatting in text descriptions for readability
+
+            CRITICAL OUTPUT FORMAT:
+            Your final response MUST be ONLY valid JSON. Do not include any markdown code blocks, explanations, or text before or after the JSON. Start your response with { and end with }. No ```json or ``` wrappers.
           USER_PROMPT_TEMPLATE: |
             Explore this codebase to answer the following query:
 
@@ -447,6 +491,8 @@ jobs:
             }
 
             Begin your exploration now. Use the available tools (Read, Glob, Grep, Bash) to investigate the codebase thoroughly before providing your structured response.
+
+            REMINDER: Your final output must be ONLY valid JSON - no markdown, no code blocks, no explanations. Start with { and end with }.
         run: node explore.js
 
       - name: Upload exploration results

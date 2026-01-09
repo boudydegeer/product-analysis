@@ -42,7 +42,7 @@
         >
           <div class="flex items-center gap-2 mb-2">
             <Avatar class="h-6 w-6">
-              <AvatarFallback>
+              <AvatarFallback :class="message.role === 'assistant' ? 'bg-primary/40' : ''">
                 <User v-if="message.role === 'user'" class="h-5 w-5" />
                 <Bot v-else class="h-5 w-5" />
               </AvatarFallback>
@@ -73,7 +73,7 @@
         <div class="max-w-[80%] rounded-lg p-4 bg-muted">
           <div class="flex items-center gap-2 mb-2">
             <Avatar class="h-6 w-6">
-              <AvatarFallback>
+              <AvatarFallback class="bg-primary/40">
                 <Bot class="h-5 w-5" />
               </AvatarFallback>
             </Avatar>
@@ -109,6 +109,7 @@
     <div class="border-t p-4 bg-background">
       <form @submit.prevent="handleSendMessage" class="flex gap-2">
         <Textarea
+          ref="messageInput"
           v-model="userMessage"
           placeholder="Share your thoughts..."
           :disabled="store.streamingMessageId !== null || loading || !isActive || interactiveElementsActive"
@@ -157,6 +158,7 @@ const router = useRouter()
 const store = useBrainstormStore()
 const userMessage = ref('')
 const messagesContainer = ref<HTMLDivElement>()
+const messageInput = ref<HTMLTextAreaElement>()
 const ws = ref<WebSocket | null>(null)
 
 const currentSession = computed(() => store.currentSession)
@@ -334,6 +336,11 @@ function handleInteraction(blockId: string, value: string | string[]) {
 function handleSkip() {
   console.log('[WS] Skipping interactive elements')
   store.clearInteractiveState()
+
+  // Focus on input after clearing interactive state
+  nextTick(() => {
+    messageInput.value?.focus()
+  })
 }
 
 function cleanup() {

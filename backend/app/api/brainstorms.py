@@ -88,8 +88,8 @@ async def create_brainstorm_session(
     """
     session = BrainstormSession(
         id=str(uuid4()),
-        title=session_in.title,
-        description=session_in.description,
+        title=session_in.title or "New Brainstorm",
+        description=session_in.description or "",
         status=BrainstormSessionStatus.ACTIVE,
     )
 
@@ -365,6 +365,72 @@ async def handle_interaction(
     await stream_claude_response(websocket, db, session_id)
 
 
+async def auto_generate_session_metadata(db, session_id: str, messages: list):
+    """Auto-generate title and description based on conversation context.
+
+    Only generates if:
+    - Session still has default title ("New Brainstorm")
+    - There are at least 2 user messages (enough context)
+    """
+    # Get session
+    result = await db.execute(
+        select(BrainstormSession).where(BrainstormSession.id == session_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session or session.title != "New Brainstorm":
+        return  # Already has a custom title
+
+    # Count user messages
+    user_message_count = sum(1 for msg in messages if msg.role == "user")
+    if user_message_count < 2:
+        return  # Not enough context yet
+
+    # Extract conversation text
+    conversation_summary = []
+    for msg in messages[:4]:  # Use first 4 messages for context
+        if msg.role == "user":
+            for block in msg.content.get("blocks", []):
+                if block["type"] == "text":
+                    conversation_summary.append(f"User: {block['text']}")
+        elif msg.role == "assistant":
+            for block in msg.content.get("blocks", []):
+                if block["type"] == "text" and "text" in block:
+                    conversation_summary.append(f"Assistant: {block['text'][:200]}")
+
+    conversation_text = "\n".join(conversation_summary)
+
+    # Generate title and description using Claude
+    try:
+        async with BrainstormingService(api_key=settings.anthropic_api_key) as service:
+            prompt = f"""Based on this brainstorming conversation, generate a concise title (max 50 chars) and brief description (max 150 chars).
+
+Conversation:
+{conversation_text}
+
+Return ONLY a JSON object with this exact format:
+{{"title": "...", "description": "..."}}"""
+
+            full_response = ""
+            async for chunk in service.stream_brainstorm_message([{"role": "user", "content": prompt}]):
+                full_response += chunk
+
+            # Extract JSON
+            json_text = extract_json_from_markdown(full_response)
+            metadata = json.loads(json_text)
+
+            # Update session
+            session.title = metadata.get("title", "New Brainstorm")[:200]
+            session.description = metadata.get("description", "")
+            await db.commit()
+
+            logger.info(f"[AUTO] Generated metadata for session {session_id}: {session.title}")
+
+    except Exception as e:
+        logger.warning(f"[AUTO] Failed to generate metadata: {e}")
+        # Not critical, just log and continue
+
+
 async def stream_claude_response(
     websocket: WebSocket,
     db,
@@ -461,6 +527,9 @@ async def stream_claude_response(
             )
             db.add(assistant_message)
             await db.commit()
+
+            # Auto-generate title/description if still default and we have enough context
+            await auto_generate_session_metadata(db, session_id, messages + [assistant_message])
 
             # Signal completion
             await websocket.send_json({

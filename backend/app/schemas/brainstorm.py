@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field
 class BrainstormSessionCreate(BaseModel):
     """Schema for creating a brainstorm session."""
 
-    title: str = Field(..., min_length=1, max_length=200)
-    description: str = Field(..., min_length=1)
+    title: str | None = Field(None, min_length=1, max_length=200)
+    description: str | None = Field(None, min_length=1)
 
 
 class BrainstormSessionUpdate(BaseModel):

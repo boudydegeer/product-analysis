@@ -114,8 +114,8 @@ export interface BrainstormSession {
 }
 
 export interface BrainstormSessionCreate {
-  title: string
-  description: string
+  title?: string
+  description?: string
 }
 
 export interface BrainstormSessionUpdate {

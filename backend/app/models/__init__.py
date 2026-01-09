@@ -10,6 +10,8 @@ from app.models.brainstorm import (
     MessageRole,
 )
 from app.models.idea import Idea, IdeaStatus, IdeaPriority
+from app.models.tool import Tool
+from app.models.agent import AgentType, AgentToolConfig, ToolUsageAudit
 
 __all__ = [
     "Base",
@@ -24,4 +26,8 @@ __all__ = [
     "Idea",
     "IdeaStatus",
     "IdeaPriority",
+    "Tool",
+    "AgentType",
+    "AgentToolConfig",
+    "ToolUsageAudit",
 ]

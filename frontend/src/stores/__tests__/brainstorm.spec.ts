@@ -65,11 +65,20 @@ describe('Brainstorm Store', () => {
 
   it('should set streaming state', () => {
     const store = useBrainstormStore()
+    store.currentSession = {
+      id: 'session-1',
+      title: 'Test Session',
+      description: 'Test',
+      status: 'active' as const,
+      messages: [],
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+    }
 
-    store.setStreaming(true)
-    expect(store.streaming).toBe(true)
+    store.startStreamingMessage('msg-1')
+    expect(store.streamingMessageId).toBe('msg-1')
 
-    store.setStreaming(false)
-    expect(store.streaming).toBe(false)
+    store.completeStreamingMessage()
+    expect(store.streamingMessageId).toBe(null)
   })
 })

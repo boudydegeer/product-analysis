@@ -21,7 +21,15 @@ describe('BrainstormChat', () => {
           id: 'msg-1',
           session_id: 'session-1',
           role: 'user',
-          content: 'Hello',
+          content: {
+            blocks: [
+              {
+                id: 'block-1',
+                type: 'text',
+                text: 'Hello',
+              },
+            ],
+          },
           created_at: '2024-01-01T00:00:00Z',
           updated_at: '2024-01-01T00:00:00Z',
         },
@@ -29,7 +37,15 @@ describe('BrainstormChat', () => {
           id: 'msg-2',
           session_id: 'session-1',
           role: 'assistant',
-          content: 'Hi there!',
+          content: {
+            blocks: [
+              {
+                id: 'block-2',
+                type: 'text',
+                text: 'Hi there!',
+              },
+            ],
+          },
           created_at: '2024-01-01T00:00:01Z',
           updated_at: '2024-01-01T00:00:01Z',
         },
@@ -37,6 +53,8 @@ describe('BrainstormChat', () => {
       created_at: '2024-01-01T00:00:00Z',
       updated_at: '2024-01-01T00:00:01Z',
     }
+    store.loading = false
+    store.setWsConnected(true)
 
     const wrapper = mount(BrainstormChat, {
       props: { sessionId: 'session-1' },
@@ -50,8 +68,8 @@ describe('BrainstormChat', () => {
 
   it('should show streaming indicator', async () => {
     const store = useBrainstormStore()
-    store.streaming = true
-    store.streamingContent = 'Thinking...'
+    store.startStreamingMessage('msg-streaming')
+    store.loading = false
 
     const wrapper = mount(BrainstormChat, {
       props: { sessionId: 'session-1' },

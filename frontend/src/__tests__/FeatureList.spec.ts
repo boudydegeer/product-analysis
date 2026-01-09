@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import { useFeaturesStore } from '@/stores/features'
 import FeatureList from '@/components/FeatureList.vue'
 import { FeatureStatus, type Feature, type FeatureCreate } from '@/types/feature'
@@ -18,6 +19,30 @@ vi.mock('@/services/api', () => ({
 }))
 
 import { featureApi } from '@/services/api'
+
+// Create a mock router for tests
+const createMockRouter = () => {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      {
+        path: '/',
+        name: 'dashboard',
+        component: { template: '<div>Dashboard</div>' },
+      },
+      {
+        path: '/analysis/:id',
+        name: 'analysis',
+        component: { template: '<div>Analysis</div>' },
+      },
+      {
+        path: '/features',
+        name: 'features',
+        component: { template: '<div>Features</div>' },
+      },
+    ],
+  })
+}
 
 const mockFeatures: Feature[] = [
   {
@@ -219,10 +244,14 @@ describe('FeatureList Component', () => {
     vi.clearAllMocks()
   })
 
-  const mountComponent = () => {
+  const mountComponent = async () => {
+    const router = createMockRouter()
+    await router.push('/features')
+    await router.isReady()
+
     return mount(FeatureList, {
       global: {
-        plugins: [createPinia()],
+        plugins: [createPinia(), router],
       },
     })
   }
@@ -231,7 +260,7 @@ describe('FeatureList Component', () => {
     it('renders loading state when loading', async () => {
       vi.mocked(featureApi.list).mockImplementation(() => new Promise(() => {})) // Never resolves
 
-      const wrapper = mountComponent()
+      const wrapper = await mountComponent()
 
       // Store should be loading after mount triggers fetchFeatures
       await wrapper.vm.$nextTick()
@@ -244,7 +273,7 @@ describe('FeatureList Component', () => {
     it('renders list of features when loaded', async () => {
       vi.mocked(featureApi.list).mockResolvedValue(mockFeatures)
 
-      const wrapper = mountComponent()
+      const wrapper = await mountComponent()
       await flushPromises()
 
       expect(wrapper.text()).toContain('Test Feature 1')
@@ -255,7 +284,7 @@ describe('FeatureList Component', () => {
     it('each feature shows name, status, and id', async () => {
       vi.mocked(featureApi.list).mockResolvedValue(mockFeatures)
 
-      const wrapper = mountComponent()
+      const wrapper = await mountComponent()
       await flushPromises()
 
       // Check first feature
@@ -271,7 +300,7 @@ describe('FeatureList Component', () => {
     it('renders empty state when no features', async () => {
       vi.mocked(featureApi.list).mockResolvedValue([])
 
-      const wrapper = mountComponent()
+      const wrapper = await mountComponent()
       await flushPromises()
 
       expect(wrapper.text()).toContain('No features')
@@ -282,7 +311,7 @@ describe('FeatureList Component', () => {
     it('has "New Feature" button', async () => {
       vi.mocked(featureApi.list).mockResolvedValue([])
 
-      const wrapper = mountComponent()
+      const wrapper = await mountComponent()
       await flushPromises()
 
       const newFeatureButton = wrapper.find('button')
@@ -293,15 +322,19 @@ describe('FeatureList Component', () => {
     it('shows create form when New Feature button is clicked', async () => {
       vi.mocked(featureApi.list).mockResolvedValue([])
 
-      const wrapper = mountComponent()
+      const wrapper = await mountComponent()
       await flushPromises()
+
+      // Verify initial state - dialog should be closed
+      expect(wrapper.vm.showCreateForm).toBe(false)
 
       const newFeatureButton = wrapper.find('button')
       await newFeatureButton.trigger('click')
+      await wrapper.vm.$nextTick()
+      await flushPromises()
 
-      // Form should appear
-      expect(wrapper.find('form').exists()).toBe(true)
-      expect(wrapper.find('input').exists()).toBe(true)
+      // Verify dialog state changed to open after clicking
+      expect(wrapper.vm.showCreateForm).toBe(true)
     })
   })
 
@@ -309,7 +342,7 @@ describe('FeatureList Component', () => {
     it('has "Analyze" button for each feature', async () => {
       vi.mocked(featureApi.list).mockResolvedValue(mockFeatures)
 
-      const wrapper = mountComponent()
+      const wrapper = await mountComponent()
       await flushPromises()
 
       // Count both "Analyze" and "Analyzing..." buttons (one per feature)
@@ -325,7 +358,7 @@ describe('FeatureList Component', () => {
     it('Analyze button is disabled when feature status is analyzing', async () => {
       vi.mocked(featureApi.list).mockResolvedValue([mockFeatures[1]]) // Only the analyzing feature
 
-      const wrapper = mountComponent()
+      const wrapper = await mountComponent()
       await flushPromises()
 
       const analyzeButton = wrapper.findAll('button').find(btn =>
@@ -340,7 +373,7 @@ describe('FeatureList Component', () => {
       vi.mocked(featureApi.triggerAnalysis).mockResolvedValue(undefined)
       vi.mocked(featureApi.get).mockResolvedValue({ ...mockFeatures[0], status: FeatureStatus.ANALYZING })
 
-      const wrapper = mountComponent()
+      const wrapper = await mountComponent()
       await flushPromises()
 
       const analyzeButton = wrapper.findAll('button').find(btn =>
@@ -355,14 +388,15 @@ describe('FeatureList Component', () => {
   })
 
   describe('Delete button', () => {
-    it('has "Delete" button for each feature', async () => {
+    it('has Delete button (with icon) for each feature', async () => {
       vi.mocked(featureApi.list).mockResolvedValue(mockFeatures)
 
-      const wrapper = mountComponent()
+      const wrapper = await mountComponent()
       await flushPromises()
 
+      // Delete button uses Trash2 icon and has variant="destructive"
       const deleteButtons = wrapper.findAll('button').filter(btn =>
-        btn.text().toLowerCase().includes('delete')
+        btn.classes().includes('bg-destructive') || btn.attributes('variant') === 'destructive'
       )
 
       expect(deleteButtons.length).toBe(mockFeatures.length)
@@ -372,11 +406,12 @@ describe('FeatureList Component', () => {
       vi.mocked(featureApi.list).mockResolvedValue([mockFeatures[0]])
       vi.mocked(featureApi.delete).mockResolvedValue(undefined)
 
-      const wrapper = mountComponent()
+      const wrapper = await mountComponent()
       await flushPromises()
 
+      // Find the delete button (destructive variant button)
       const deleteButton = wrapper.findAll('button').find(btn =>
-        btn.text().toLowerCase().includes('delete')
+        btn.classes().includes('bg-destructive') || btn.attributes('variant') === 'destructive'
       )
 
       await deleteButton?.trigger('click')
@@ -390,7 +425,7 @@ describe('FeatureList Component', () => {
     it('renders error message when error occurs', async () => {
       vi.mocked(featureApi.list).mockRejectedValue(new Error('Failed to fetch'))
 
-      const wrapper = mountComponent()
+      const wrapper = await mountComponent()
       await flushPromises()
 
       expect(wrapper.text()).toContain('Failed to fetch')

@@ -1,12 +1,37 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import DashboardView from '../views/DashboardView.vue'
 import { useFeaturesStore } from '../stores/features'
 
 vi.mock('../stores/features', () => ({
   useFeaturesStore: vi.fn()
 }))
+
+// Create a mock router for tests
+const createMockRouter = () => {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      {
+        path: '/',
+        name: 'dashboard',
+        component: { template: '<div>Dashboard</div>' },
+      },
+      {
+        path: '/analysis/:id',
+        name: 'analysis',
+        component: { template: '<div>Analysis</div>' },
+      },
+      {
+        path: '/features',
+        name: 'features',
+        component: { template: '<div>Features</div>' },
+      },
+    ],
+  })
+}
 
 describe('DashboardView - Analysis Integration', () => {
   beforeEach(() => {
@@ -31,8 +56,16 @@ describe('DashboardView - Analysis Integration', () => {
     } as any)
   })
 
-  it('should open analysis dialog when feature is clicked', async () => {
-    const wrapper = mount(DashboardView)
+  it('should navigate to analysis page when feature is clicked', async () => {
+    const router = createMockRouter()
+    await router.push('/')
+    await router.isReady()
+
+    const wrapper = mount(DashboardView, {
+      global: {
+        plugins: [createPinia(), router],
+      },
+    })
 
     // Find and click a feature row
     const featureRow = wrapper.find('[data-testid="feature-row"]')
@@ -41,24 +74,28 @@ describe('DashboardView - Analysis Integration', () => {
     // Click the feature row
     await featureRow.trigger('click')
 
-    // Wait for next tick to allow state to update
-    await wrapper.vm.$nextTick()
+    // Wait for all promises to flush (including router navigation)
+    await flushPromises()
 
-    // Verify the dialog component receives the correct props
-    const dialog = wrapper.findComponent({ name: 'AnalysisDialog' })
-    expect(dialog.exists()).toBe(true)
-    expect(dialog.props('open')).toBe(true)
-    expect(dialog.props('featureId')).toBe('FEAT-001')
-    expect(dialog.props('featureName')).toBe('Test Feature 1')
+    // Verify router navigation was called
+    expect(router.currentRoute.value.name).toBe('analysis')
+    expect(router.currentRoute.value.params.id).toBe('FEAT-001')
   })
 
-  it('should show AnalysisDialog component when integrated', () => {
-    const wrapper = mount(DashboardView)
+  it('should render feature cards with correct data', async () => {
+    const router = createMockRouter()
+    await router.push('/')
+    await router.isReady()
 
-    // Once integrated, we should find the AnalysisDialog component
-    const dialog = wrapper.findComponent({ name: 'AnalysisDialog' })
+    const wrapper = mount(DashboardView, {
+      global: {
+        plugins: [createPinia(), router],
+      },
+    })
 
-    // Dialog component should now exist
-    expect(dialog.exists()).toBe(true)
+    // Verify feature data is rendered
+    expect(wrapper.text()).toContain('Test Feature 1')
+    expect(wrapper.text()).toContain('FEAT-001')
+    expect(wrapper.text()).toContain('completed')
   })
 })

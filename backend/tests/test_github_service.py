@@ -65,6 +65,7 @@ class TestTriggerAnalysisWorkflow:
     async def test_trigger_analysis_workflow_success(self, github_service):
         """Successful workflow trigger should return run_id."""
         feature_id = UUID("12345678-1234-5678-1234-567812345678")
+        feature_description = "Test feature for analysis"
 
         # Mock the HTTP response for workflow dispatch
         mock_dispatch_response = MagicMock()
@@ -91,7 +92,9 @@ class TestTriggerAnalysisWorkflow:
             mock_client.post.return_value = mock_dispatch_response
             mock_client.get.return_value = mock_runs_response
 
-            run_id = await github_service.trigger_analysis_workflow(feature_id)
+            run_id = await github_service.trigger_analysis_workflow(
+                feature_id, feature_description
+            )
 
             assert run_id == 12345
             mock_client.post.assert_called_once()
@@ -102,6 +105,7 @@ class TestTriggerAnalysisWorkflow:
     ):
         """Failed workflow trigger should raise GitHubServiceError."""
         feature_id = UUID("12345678-1234-5678-1234-567812345678")
+        feature_description = "Test feature for analysis"
 
         mock_response = MagicMock()
         mock_response.status_code = 422
@@ -117,7 +121,9 @@ class TestTriggerAnalysisWorkflow:
             mock_client.post.return_value = mock_response
 
             with pytest.raises(GitHubServiceError) as exc_info:
-                await github_service.trigger_analysis_workflow(feature_id)
+                await github_service.trigger_analysis_workflow(
+                    feature_id, feature_description
+                )
 
             assert "Failed to trigger workflow" in str(exc_info.value)
 

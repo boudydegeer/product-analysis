@@ -7,10 +7,10 @@ from app.database import get_db
 from app.models import Base
 
 # Import all models to ensure they're registered with Base metadata
-from app.models.feature import Feature
-from app.models.analysis import Analysis
-from app.models.idea import Idea
-from app.models.brainstorm import BrainstormSession, BrainstormMessage
+from app.models.feature import Feature  # noqa: F401
+from app.models.analysis import Analysis  # noqa: F401
+from app.models.idea import Idea  # noqa: F401
+from app.models.brainstorm import BrainstormSession, BrainstormMessage  # noqa: F401
 
 
 # Test database URL
@@ -67,8 +67,8 @@ async def db_session(test_db):
 
 
 @pytest.fixture
-async def async_client(test_db):
-    """Create an async test client for the FastAPI app."""
+async def test_app(test_db):
+    """Create a test FastAPI app instance."""
     # Import the main module to avoid starting scheduler during tests
     from fastapi import FastAPI
     from app.api.features import router as features_router
@@ -78,14 +78,14 @@ async def async_client(test_db):
     from app.config import settings
 
     # Create a test app without lifespan to avoid starting scheduler
-    test_app = FastAPI(title=settings.app_name, debug=settings.debug)
-    test_app.include_router(features_router)
-    test_app.include_router(webhooks_router)
-    test_app.include_router(brainstorms_router)
-    test_app.include_router(ideas_router)
+    app = FastAPI(title=settings.app_name, debug=settings.debug)
+    app.include_router(features_router)
+    app.include_router(webhooks_router)
+    app.include_router(brainstorms_router)
+    app.include_router(ideas_router)
 
     # Add health endpoint for tests
-    @test_app.get("/health")
+    @app.get("/health")
     async def health_check():
         """Health check endpoint."""
         return {"status": "healthy", "app": settings.app_name}
@@ -97,10 +97,16 @@ async def async_client(test_db):
             finally:
                 await session.close()
 
-    test_app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_db] = override_get_db
 
+    yield app
+
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def async_client(test_app):
+    """Create an async test client for the FastAPI app."""
     transport = ASGITransport(app=test_app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
-
-    test_app.dependency_overrides.clear()

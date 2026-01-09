@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import App from '../App.vue'
 
 // Mock the API module
@@ -15,37 +16,76 @@ vi.mock('@/services/api', () => ({
   },
 }))
 
+// Create a mock router for tests
+const createMockRouter = () => {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      {
+        path: '/',
+        name: 'dashboard',
+        component: { template: '<div>Dashboard</div>' },
+      },
+      {
+        path: '/features',
+        name: 'features',
+        component: { template: '<div>Features</div>' },
+      },
+    ],
+  })
+}
+
 describe('App', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
   })
 
-  it('renders successfully', () => {
+  it('renders successfully', async () => {
+    const router = createMockRouter()
+    await router.push('/')
+    await router.isReady()
+
     const wrapper = mount(App, {
       global: {
-        plugins: [createPinia()],
+        plugins: [createPinia(), router],
       },
     })
     expect(wrapper.exists()).toBe(true)
   })
 
-  it('renders the FeatureList component', async () => {
+  it('renders router-view component', async () => {
+    const router = createMockRouter()
+    await router.push('/')
+    await router.isReady()
+
     const wrapper = mount(App, {
       global: {
-        plugins: [createPinia()],
+        plugins: [createPinia(), router],
       },
     })
     await flushPromises()
-    expect(wrapper.findComponent({ name: 'FeatureList' }).exists()).toBe(true)
+
+    // Check that router-view rendered the route component
+    expect(wrapper.html()).toContain('Dashboard')
   })
 
-  it('displays the Product Analysis Platform header', async () => {
+  it('navigates between routes', async () => {
+    const router = createMockRouter()
+    await router.push('/')
+    await router.isReady()
+
     const wrapper = mount(App, {
       global: {
-        plugins: [createPinia()],
+        plugins: [createPinia(), router],
       },
     })
+
+    expect(wrapper.html()).toContain('Dashboard')
+
+    // Navigate to features
+    await router.push('/features')
     await flushPromises()
-    expect(wrapper.text()).toContain('Product Analysis Platform')
+
+    expect(wrapper.html()).toContain('Features')
   })
 })

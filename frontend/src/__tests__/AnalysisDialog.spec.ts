@@ -24,7 +24,8 @@ describe('AnalysisDialog', () => {
 
     // Check that Dialog component is rendered
     expect(wrapper.findComponent({ name: 'Dialog' }).exists()).toBe(true)
-    expect(wrapper.props('open')).toBe(true)
+    // Verify the component received the open prop
+    expect((wrapper.vm.$props as any).open).toBe(true)
   })
 
   it('should not render dialog when closed', () => {
@@ -41,7 +42,7 @@ describe('AnalysisDialog', () => {
       },
     })
 
-    expect(wrapper.props('open')).toBe(false)
+    expect((wrapper.vm.$props as any).open).toBe(false)
   })
 
   it('should emit close event', async () => {

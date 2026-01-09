@@ -5,65 +5,13 @@ Uses SQLite in-memory database with aiosqlite for async operations.
 """
 
 import pytest
-from typing import AsyncGenerator
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.main import app
-from app.database import get_db
-from app.models import Base, Feature, FeatureStatus
-
-
-# Test database setup - SQLite in-memory with async
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
-test_engine = create_async_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    echo=False,
-)
-
-TestingAsyncSessionLocal = async_sessionmaker(
-    test_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False,
-)
-
-
-async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Override database dependency with test database."""
-    async with TestingAsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
-
-
-# Override the database dependency
-app.dependency_overrides[get_db] = override_get_db
-
-
-@pytest.fixture(autouse=True)
-async def setup_database():
-    """Create tables before each test and drop after."""
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-
-@pytest.fixture
-async def async_client():
-    """Create an async test client for the FastAPI app."""
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
+from app.models import Feature, FeatureStatus
 
 
 @pytest.fixture
@@ -74,13 +22,6 @@ def sample_feature_data():
         "description": "Add OAuth2 authentication with Google and GitHub providers",
         "priority": 1,
     }
-
-
-@pytest.fixture
-async def db_session():
-    """Get a test database session."""
-    async with TestingAsyncSessionLocal() as session:
-        yield session
 
 
 # =============================================================================
@@ -399,7 +340,7 @@ class TestTriggerAnalysis:
 
     @pytest.mark.asyncio
     async def test_trigger_analysis_success(
-        self, async_client: AsyncClient, sample_feature_data: dict, mock_github_service
+        self, async_client: AsyncClient, test_app, sample_feature_data: dict, mock_github_service
     ):
         """Test triggering analysis returns run_id and updates status."""
         from app.api.features import get_github_service
@@ -411,7 +352,7 @@ class TestTriggerAnalysis:
         feature_id = create_response.json()["id"]
 
         # Override the GitHub service dependency
-        app.dependency_overrides[get_github_service] = lambda: mock_github_service
+        test_app.dependency_overrides[get_github_service] = lambda: mock_github_service
 
         try:
             response = await async_client.post(f"/api/v1/features/{feature_id}/analyze")
@@ -426,18 +367,18 @@ class TestTriggerAnalysis:
             assert get_response.json()["status"] == "analyzing"
         finally:
             # Clean up dependency override
-            if get_github_service in app.dependency_overrides:
-                del app.dependency_overrides[get_github_service]
+            if get_github_service in test_app.dependency_overrides:
+                del test_app.dependency_overrides[get_github_service]
 
     @pytest.mark.asyncio
     async def test_trigger_analysis_not_found(
-        self, async_client: AsyncClient, mock_github_service
+        self, async_client: AsyncClient, test_app, mock_github_service
     ):
         """Test triggering analysis for non-existent feature returns 404."""
         from app.api.features import get_github_service
 
         # Override the GitHub service dependency
-        app.dependency_overrides[get_github_service] = lambda: mock_github_service
+        test_app.dependency_overrides[get_github_service] = lambda: mock_github_service
 
         try:
             non_existent_id = str(uuid4())
@@ -448,12 +389,12 @@ class TestTriggerAnalysis:
             assert response.status_code == 404
         finally:
             # Clean up dependency override
-            if get_github_service in app.dependency_overrides:
-                del app.dependency_overrides[get_github_service]
+            if get_github_service in test_app.dependency_overrides:
+                del test_app.dependency_overrides[get_github_service]
 
     @pytest.mark.asyncio
     async def test_trigger_analysis_stores_workflow_run_id(
-        self, async_client: AsyncClient, sample_feature_data: dict
+        self, async_client: AsyncClient, test_app, sample_feature_data: dict
     ):
         """Test triggering analysis stores the workflow run_id on the feature."""
         from app.api.features import get_github_service
@@ -471,7 +412,7 @@ class TestTriggerAnalysis:
         mock_service.trigger_analysis_workflow.return_value = expected_run_id
 
         # Override the GitHub service dependency
-        app.dependency_overrides[get_github_service] = lambda: mock_service
+        test_app.dependency_overrides[get_github_service] = lambda: mock_service
 
         try:
             await async_client.post(f"/api/v1/features/{feature_id}/analyze")
@@ -483,12 +424,12 @@ class TestTriggerAnalysis:
             )
         finally:
             # Clean up dependency override
-            if get_github_service in app.dependency_overrides:
-                del app.dependency_overrides[get_github_service]
+            if get_github_service in test_app.dependency_overrides:
+                del test_app.dependency_overrides[get_github_service]
 
     @pytest.mark.asyncio
     async def test_trigger_analysis_github_error(
-        self, async_client: AsyncClient, sample_feature_data: dict
+        self, async_client: AsyncClient, test_app, sample_feature_data: dict
     ):
         """Test triggering analysis when GitHub fails returns 500."""
         from app.api.features import get_github_service
@@ -506,7 +447,7 @@ class TestTriggerAnalysis:
         )
 
         # Override the GitHub service dependency
-        app.dependency_overrides[get_github_service] = lambda: mock_service
+        test_app.dependency_overrides[get_github_service] = lambda: mock_service
 
         try:
             response = await async_client.post(f"/api/v1/features/{feature_id}/analyze")
@@ -515,8 +456,8 @@ class TestTriggerAnalysis:
             assert "error" in response.json()["detail"].lower()
         finally:
             # Clean up dependency override
-            if get_github_service in app.dependency_overrides:
-                del app.dependency_overrides[get_github_service]
+            if get_github_service in test_app.dependency_overrides:
+                del test_app.dependency_overrides[get_github_service]
 
 
 # =============================================================================
@@ -605,7 +546,7 @@ class TestTriggerAnalysisWithCallback:
 
     @pytest.mark.asyncio
     async def test_trigger_analysis_includes_callback_url_when_webhook_base_url_set(
-        self, db_session: AsyncSession, monkeypatch
+        self, async_client: AsyncClient, test_app, db_session: AsyncSession, monkeypatch
     ):
         """Trigger analysis should include callback URL when webhook_base_url is configured."""
         # Create feature with UUID
@@ -632,11 +573,10 @@ class TestTriggerAnalysisWithCallback:
         mock_github_service.trigger_analysis_workflow.return_value = 12345
 
         # Override the GitHub service dependency
-        app.dependency_overrides[get_github_service] = lambda: mock_github_service
+        test_app.dependency_overrides[get_github_service] = lambda: mock_github_service
 
         try:
-            async with AsyncClient(app=app, base_url="http://test") as client:
-                response = await client.post(f"/api/v1/features/{feature_id}/analyze")
+            response = await async_client.post(f"/api/v1/features/{feature_id}/analyze")
 
             assert response.status_code == 202
 
@@ -650,12 +590,12 @@ class TestTriggerAnalysisWithCallback:
             assert "/api/v1/webhooks/analysis-result" in callback_url
         finally:
             # Clean up dependency override
-            if get_github_service in app.dependency_overrides:
-                del app.dependency_overrides[get_github_service]
+            if get_github_service in test_app.dependency_overrides:
+                del test_app.dependency_overrides[get_github_service]
 
     @pytest.mark.asyncio
     async def test_trigger_analysis_skips_callback_url_when_webhook_base_url_not_set(
-        self, db_session: AsyncSession, monkeypatch
+        self, async_client: AsyncClient, test_app, db_session: AsyncSession, monkeypatch
     ):
         """Trigger analysis should not include callback URL when webhook_base_url is None."""
         # Create feature with UUID
@@ -682,11 +622,10 @@ class TestTriggerAnalysisWithCallback:
         mock_github_service.trigger_analysis_workflow.return_value = 12345
 
         # Override the GitHub service dependency
-        app.dependency_overrides[get_github_service] = lambda: mock_github_service
+        test_app.dependency_overrides[get_github_service] = lambda: mock_github_service
 
         try:
-            async with AsyncClient(app=app, base_url="http://test") as client:
-                response = await client.post(f"/api/v1/features/{feature_id}/analyze")
+            response = await async_client.post(f"/api/v1/features/{feature_id}/analyze")
 
             assert response.status_code == 202
 
@@ -698,5 +637,5 @@ class TestTriggerAnalysisWithCallback:
             assert callback_url is None
         finally:
             # Clean up dependency override
-            if get_github_service in app.dependency_overrides:
-                del app.dependency_overrides[get_github_service]
+            if get_github_service in test_app.dependency_overrides:
+                del test_app.dependency_overrides[get_github_service]

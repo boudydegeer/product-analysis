@@ -1,70 +1,11 @@
 """Test analysis detail endpoint."""
 import pytest
 from datetime import datetime, UTC
-from typing import AsyncGenerator
 from uuid import uuid4
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.main import app
-from app.database import get_db
-from app.models import Base, Feature, FeatureStatus, Analysis
-
-
-# Test database setup - SQLite in-memory with async
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
-test_engine = create_async_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    echo=False,
-)
-
-TestingAsyncSessionLocal = async_sessionmaker(
-    test_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False,
-)
-
-
-async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Override database dependency with test database."""
-    async with TestingAsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
-
-
-# Override the database dependency
-app.dependency_overrides[get_db] = override_get_db
-
-
-@pytest.fixture(autouse=True)
-async def setup_database():
-    """Create tables before each test and drop after."""
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-
-@pytest.fixture
-async def async_client():
-    """Create an async test client for the FastAPI app."""
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
-
-
-@pytest.fixture
-async def db_session():
-    """Get a test database session."""
-    async with TestingAsyncSessionLocal() as session:
-        yield session
+from app.models import Feature, FeatureStatus, Analysis
 
 
 @pytest.mark.asyncio

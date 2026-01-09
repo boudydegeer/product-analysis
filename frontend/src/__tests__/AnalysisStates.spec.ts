@@ -13,7 +13,7 @@ describe('Analysis State Components', () => {
 
   it('should render no analysis state', () => {
     const wrapper = mount(NoAnalysisState)
-    expect(wrapper.text()).toContain('No Analysis Available')
+    expect(wrapper.text()).toContain('No analysis available')
   })
 
   it('should render failed state with error message', () => {

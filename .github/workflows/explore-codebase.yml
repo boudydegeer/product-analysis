@@ -1,4 +1,4 @@
-name: Explore Codebase
+name: Explore Codebase with Claude Agent SDK
 
 on:
   workflow_dispatch:
@@ -74,10 +74,10 @@ jobs:
           echo "Cleanup complete. Remaining structure:"
           du -sh * 2>/dev/null | head -20
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
+          node-version: '20'
 
       - name: Validate inputs
         id: validate
@@ -89,9 +89,230 @@ jobs:
           echo "callback_url=${{ github.event.inputs.callback_url }}" >> $GITHUB_OUTPUT
           echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
 
-      - name: Install dependencies
+      - name: Create exploration script
         run: |
-          pip install anthropic requests
+          cat > package.json << 'EOF'
+          {
+            "type": "module",
+            "dependencies": {
+              "@anthropic-ai/claude-agent-sdk": "*",
+              "axios": "*"
+            }
+          }
+          EOF
+
+          cat > explore.js << 'EOF'
+          import { query } from '@anthropic-ai/claude-agent-sdk';
+          import fs from 'fs';
+          import axios from 'axios';
+
+          const explorationId = process.env.EXPLORATION_ID;
+          const userQuery = process.env.QUERY;
+          const scope = process.env.SCOPE || 'full';
+          const focus = process.env.FOCUS || 'patterns';
+          const callbackUrl = process.env.CALLBACK_URL;
+          const timestamp = process.env.TIMESTAMP;
+          const systemPrompt = process.env.SYSTEM_PROMPT;
+          const userPromptTemplate = process.env.USER_PROMPT_TEMPLATE;
+
+          const userPrompt = userPromptTemplate
+            .replace('{{EXPLORATION_ID}}', explorationId)
+            .replace('{{QUERY}}', userQuery)
+            .replace('{{SCOPE}}', scope)
+            .replace('{{FOCUS}}', focus);
+
+          console.log('Starting Claude Agent SDK codebase exploration...');
+          console.log('Exploration ID:', explorationId);
+          console.log('Query:', userQuery);
+          console.log('Scope:', scope);
+          console.log('Focus:', focus);
+          console.log('Timestamp:', timestamp);
+          console.log('---\n');
+
+          async function runExploration() {
+            try {
+              const options = {
+                systemPrompt: systemPrompt,
+                permissionMode: 'bypassPermissions',
+                allowDangerouslySkipPermissions: true,
+                allowedTools: ['Read', 'Glob', 'Grep', 'Bash'],
+                maxTurns: 25,
+                maxBudgetUsd: 1.50,
+                apiKey: process.env.ANTHROPIC_API_KEY
+              };
+
+              console.log('Executing query with SDK...\n');
+
+              let fullOutput = '';
+              let resultContent = null;
+
+              for await (const message of query({ prompt: userPrompt, options })) {
+                if (message.type === 'system') {
+                  console.log('[SYSTEM]', JSON.stringify({
+                    model: message.model,
+                    tools: message.tools,
+                    cwd: message.cwd
+                  }));
+                } else if (message.type === 'assistant') {
+                  const content = message.content || '';
+                  fullOutput += content;
+                  process.stdout.write(content);
+                } else if (message.type === 'result') {
+                  console.log('\n[RESULT]', JSON.stringify(message, null, 2));
+                  if (message.result) {
+                    resultContent = message.result;
+                    console.log('\nExtracted result content from message.result');
+                  } else if (message.content) {
+                    resultContent = message.content;
+                    console.log('\nExtracted result content from message.content (fallback)');
+                  }
+                } else {
+                  console.log('\n[' + (message.type?.toUpperCase() || 'UNKNOWN') + ']', message);
+                }
+              }
+
+              console.log('\n\n---');
+              console.log('Claude Agent SDK exploration complete');
+
+              let explorationResult;
+              const contentToAnalyze = resultContent || fullOutput;
+
+              try {
+                const jsonMatch = contentToAnalyze.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                  explorationResult = JSON.parse(jsonMatch[0]);
+                  console.log('Successfully parsed structured JSON output');
+                } else {
+                  console.warn('Could not find JSON in output, wrapping raw output');
+                  explorationResult = {
+                    exploration_id: explorationId,
+                    query: userQuery,
+                    status: 'completed',
+                    results: {
+                      summary: contentToAnalyze.substring(0, 500),
+                      relevant_files: [],
+                      key_patterns: [],
+                      code_examples: [],
+                      architecture_notes: '',
+                      recommendations: [],
+                      confidence: 'medium',
+                      raw_response: contentToAnalyze
+                    },
+                    error: 'Could not parse structured JSON from Claude response'
+                  };
+                }
+              } catch (parseError) {
+                console.error('Failed to parse JSON:', parseError.message);
+                explorationResult = {
+                  exploration_id: explorationId,
+                  query: userQuery,
+                  status: 'completed',
+                  results: {
+                    summary: contentToAnalyze.substring(0, 500),
+                    relevant_files: [],
+                    key_patterns: [],
+                    code_examples: [],
+                    architecture_notes: '',
+                    recommendations: [],
+                    confidence: 'low',
+                    raw_response: contentToAnalyze
+                  },
+                  error: parseError.message
+                };
+              }
+
+              // Ensure required fields exist
+              if (!explorationResult.exploration_id) {
+                explorationResult.exploration_id = explorationId;
+              }
+              if (!explorationResult.query) {
+                explorationResult.query = userQuery;
+              }
+              if (!explorationResult.status) {
+                explorationResult.status = 'completed';
+              }
+
+              explorationResult.metadata = {
+                scope: scope,
+                focus: focus,
+                explored_at: timestamp,
+                workflow_run_id: process.env.GITHUB_RUN_ID,
+                workflow_run_number: process.env.GITHUB_RUN_NUMBER,
+                repository: process.env.GITHUB_REPOSITORY,
+                actor: process.env.GITHUB_ACTOR
+              };
+
+              const outputFile = '/tmp/exploration_result.json';
+              fs.writeFileSync(outputFile, JSON.stringify(explorationResult, null, 2));
+              console.log('Exploration results saved to:', outputFile);
+
+              if (callbackUrl && callbackUrl.trim() !== '') {
+                console.log('\nPosting results to callback URL:', callbackUrl);
+                try {
+                  const response = await axios.post(callbackUrl, explorationResult, {
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'X-Exploration-ID': explorationId,
+                      'X-Workflow-Run-ID': process.env.GITHUB_RUN_ID
+                    },
+                    timeout: 10000
+                  });
+                  console.log('Callback response status:', response.status);
+                  console.log('Callback response:', response.data);
+                } catch (callbackError) {
+                  console.error('Failed to post to callback URL:', callbackError.message);
+                  if (callbackError.response) {
+                    console.error('Response status:', callbackError.response.status);
+                    console.error('Response data:', callbackError.response.data);
+                  }
+                }
+              }
+
+              console.log('\n=== EXPLORATION COMPLETE ===');
+              console.log(JSON.stringify(explorationResult, null, 2));
+
+            } catch (error) {
+              console.error('\nExploration failed with error:');
+              console.error(error);
+
+              const errorResult = {
+                exploration_id: explorationId,
+                query: userQuery,
+                status: 'failed',
+                error: error.message,
+                stack: error.stack,
+                results: {
+                  summary: 'Exploration failed: ' + error.message,
+                  relevant_files: [],
+                  key_patterns: [],
+                  code_examples: [],
+                  architecture_notes: '',
+                  recommendations: [],
+                  confidence: 'low'
+                },
+                metadata: {
+                  scope: scope,
+                  focus: focus,
+                  explored_at: timestamp,
+                  workflow_run_id: process.env.GITHUB_RUN_ID,
+                  workflow_run_number: process.env.GITHUB_RUN_NUMBER,
+                  repository: process.env.GITHUB_REPOSITORY,
+                  actor: process.env.GITHUB_ACTOR
+                }
+              };
+
+              const outputFile = '/tmp/exploration_result.json';
+              fs.writeFileSync(outputFile, JSON.stringify(errorResult, null, 2));
+
+              process.exit(1);
+            }
+          }
+
+          runExploration();
+          EOF
+
+      - name: Install dependencies
+        run: npm install
 
       - name: Run codebase exploration
         env:
@@ -106,7 +327,127 @@ jobs:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_ACTOR: ${{ github.actor }}
-        run: python .github/scripts/explore_codebase.py
+          SYSTEM_PROMPT: |
+            You are a senior software architect specializing in codebase exploration and understanding.
+
+            SCOPE CONFIGURATION:
+            - Scope: {{SCOPE}}
+            - If scope is "backend": Focus ONLY on the /backend directory and its contents
+            - If scope is "frontend": Focus ONLY on the /frontend directory and its contents
+            - If scope is "full": Explore the entire codebase
+
+            FOCUS CONFIGURATION: {{FOCUS}}
+
+            FOCUS INSTRUCTIONS BY TYPE:
+
+            **patterns** - Identify coding patterns and conventions:
+            - Look for recurring code patterns and design patterns (Factory, Repository, Singleton, etc.)
+            - Note naming conventions for files, classes, functions, variables
+            - Find common utilities and helper functions
+            - Identify error handling patterns
+            - Look for testing patterns and conventions
+
+            **files** - Find relevant files:
+            - Identify entry points and main modules
+            - Locate configuration files
+            - Find related test files
+            - Identify files that would need modification for related features
+
+            **architecture** - Understand system architecture:
+            - Map out the overall system design and structure
+            - Identify main components and their responsibilities
+            - Understand data flow and communication patterns
+            - Find API endpoints and their handlers
+            - Identify database models and relationships
+            - Look for service boundaries and integrations
+
+            **dependencies** - Analyze dependencies:
+            - Identify external libraries and frameworks
+            - Find package manager configurations (package.json, pyproject.toml, etc.)
+            - Look for API integrations with external services
+            - Identify database and storage dependencies
+            - Find infrastructure dependencies (Docker, CI/CD, etc.)
+
+            EXPLORATION METHODOLOGY:
+
+            1. START WITH STRUCTURE:
+               - Use Glob to get an overview of the directory structure
+               - Identify key directories and their purposes
+               - Look at configuration files first (package.json, pyproject.toml, etc.)
+
+            2. DIVE INTO DETAILS:
+               - Use Read to examine key files
+               - Use Grep to find specific patterns, imports, or function definitions
+               - Follow the code flow to understand relationships
+
+            3. GATHER EVIDENCE:
+               - Collect specific file paths that are relevant
+               - Note code snippets that illustrate patterns
+               - Document architectural decisions you observe
+
+            4. OUTPUT REQUIREMENTS:
+               - Provide your findings as structured JSON
+               - Include specific file paths and code examples
+               - Be precise about what you found vs. what you inferred
+               - Rate your confidence level based on evidence quality
+
+            IMPORTANT:
+            - Be thorough but efficient - focus on what's relevant to the query
+            - Provide actionable insights with specific file references
+            - If you can't find something, say so rather than guessing
+            - Use Markdown formatting in text descriptions for readability
+          USER_PROMPT_TEMPLATE: |
+            Explore this codebase to answer the following query:
+
+            Exploration ID: {{EXPLORATION_ID}}
+            Query: {{QUERY}}
+            Scope: {{SCOPE}}
+            Focus: {{FOCUS}}
+
+            Please explore the codebase and provide your findings in the following JSON format:
+
+            {
+              "exploration_id": "{{EXPLORATION_ID}}",
+              "query": "{{QUERY}}",
+              "status": "completed",
+              "results": {
+                "summary": "A comprehensive summary of your findings (use Markdown formatting)",
+                "relevant_files": [
+                  {
+                    "path": "path/to/file.ext",
+                    "purpose": "Brief description of what this file does",
+                    "relevance": "Why this file is relevant to the query"
+                  }
+                ],
+                "key_patterns": [
+                  {
+                    "name": "Pattern name",
+                    "description": "Description of the pattern (use Markdown)",
+                    "examples": ["path/to/example1.py", "path/to/example2.py"],
+                    "usage": "How/where this pattern is used"
+                  }
+                ],
+                "code_examples": [
+                  {
+                    "file": "path/to/file.ext",
+                    "description": "What this code demonstrates",
+                    "snippet": "Relevant code snippet (keep it concise)"
+                  }
+                ],
+                "architecture_notes": "Observations about the system architecture (use Markdown formatting with headings, lists, etc.)",
+                "recommendations": [
+                  {
+                    "type": "improvement|observation|warning",
+                    "title": "Short title",
+                    "description": "Detailed recommendation (use Markdown)"
+                  }
+                ],
+                "confidence": "high|medium|low"
+              }
+            }
+
+            Begin your exploration now. Use the available tools (Read, Glob, Grep, Bash) to investigate the codebase thoroughly before providing your structured response.
+        run: node explore.js
 
       - name: Upload exploration results
         if: always()
@@ -115,26 +456,6 @@ jobs:
           name: exploration-results-${{ github.event.inputs.exploration_id }}
           path: /tmp/exploration_result.json
           retention-days: 7
-
-      - name: Post results to callback URL
-        if: ${{ github.event.inputs.callback_url != '' }}
-        run: |
-          if [ -f /tmp/exploration_result.json ]; then
-            echo "Posting results to callback URL: ${{ github.event.inputs.callback_url }}"
-            curl -X POST \
-              -H "Content-Type: application/json" \
-              -H "X-Exploration-ID: ${{ github.event.inputs.exploration_id }}" \
-              -H "X-Workflow-Run-ID: ${{ github.run_id }}" \
-              -d @/tmp/exploration_result.json \
-              --max-time 30 \
-              --retry 3 \
-              --retry-delay 5 \
-              "${{ github.event.inputs.callback_url }}" \
-              && echo "Callback successful" \
-              || echo "Callback failed but continuing workflow"
-          else
-            echo "No results file found to post"
-          fi
 
       - name: Generate summary
         if: always()

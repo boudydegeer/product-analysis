@@ -73,9 +73,9 @@ function toggleOption(value: string, checked: boolean | 'indeterminate') {
       <div v-for="option in block.options" :key="option.value" class="flex items-start gap-2">
         <Checkbox
           :id="option.value"
-          :checked="isChecked(option.value)"
+          :model-value="isChecked(option.value)"
           :disabled="!interactive || interacting"
-          @update:checked="(checked) => toggleOption(option.value, checked)"
+          @update:model-value="(checked) => toggleOption(option.value, checked)"
         />
         <div class="grid gap-1.5 leading-none">
           <Label :for="option.value" class="text-sm font-normal cursor-pointer">

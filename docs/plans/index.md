@@ -69,11 +69,32 @@ This document tracks the status of all implementation plans for the Product Anal
 
 ---
 
+### [Dynamic Tools System](./2026-01-09-dynamic-tools-system.md)
+**Status:** ✅ Done
+**Description:** Database-driven system for managing Claude Agent SDK tools and personalized agents
+**Notes:** Implementation completed - All 12 tasks finished. System functional with minor quality improvements needed (coverage 75%, some linting issues).
+
+
+---
+
+---
+
 ## 🟡 In Progress
 
 ### [Analysis Details UI Implementation Plan](./2026-01-08-analysis-details-ui-implementation.md)
 **Status:** 🟡 In Progress
 **Description:** Implementation plan for analysis details interface with flattened schema, API endpoint, and Vue components
+
+
+---
+
+---
+
+## 🟢 Ready
+
+### [Codebase Exploration Tool](./2026-01-09-codebase-exploration-tool.md)
+**Status:** 🟢 Ready
+**Description:** Enable agents to explore repository via GitHub Actions with Claude Agent SDK
 
 
 ---
@@ -130,9 +151,10 @@ This document tracks the status of all implementation plans for the Product Anal
 
 | Status | Count | Percentage |
 |--------|-------|------------|
-| ✅ Done | 4 | 67% |
-| 🟡 In Progress | 1 | 17% |
-| 🔴 Backlog | 1 | 17% |
+| ✅ Done | 5 | 63% |
+| 🟡 In Progress | 1 | 13% |
+| 🟢 Ready | 1 | 13% |
+| 🔴 Backlog | 1 | 13% |
 
 ### Completed Features
 - Feature Analysis Module (MVP)
@@ -168,6 +190,9 @@ This document tracks the status of all implementation plans for the Product Anal
 ## 📝 Change Log
 
 ### 2026-01-09
+- ✅ Updated [Dynamic Tools System](./2026-01-09-dynamic-tools-system.md): Ready → Done - Implementation completed - All 12 tasks finished. System functional with minor quality improvements needed (coverage 75%, some linting issues).
+- 🟢 Registered new plan: [Codebase Exploration Tool](./2026-01-09-codebase-exploration-tool.md) as Ready
+- 🟢 Registered new plan: [Dynamic Tools System](./2026-01-09-dynamic-tools-system.md) as Ready
 - ✅ Registered new plan: [Interactive Brainstorming Elements Implementation](./2026-01-09-interactive-brainstorming-implementation.md) as Done
 
 ### 2026-01-08

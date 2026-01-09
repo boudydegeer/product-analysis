@@ -21,6 +21,7 @@ const interacting = ref(false)
 
 const selectedCount = computed(() => selected.value.length)
 const canSubmit = computed(() => props.interactive && selectedCount.value > 0 && !interacting.value)
+const allSelected = computed(() => selected.value.length === props.block.options.length)
 
 function handleSubmit() {
   if (canSubmit.value) {
@@ -32,6 +33,18 @@ function handleSubmit() {
 
 function handleSkip() {
   emit('skip')
+}
+
+function toggleSelectAll() {
+  if (interacting.value || !props.interactive) return
+
+  if (allSelected.value) {
+    // Deselect all
+    selected.value = []
+  } else {
+    // Select all
+    selected.value = props.block.options.map(opt => opt.id)
+  }
 }
 
 function isChecked(value: string) {
@@ -70,7 +83,16 @@ function toggleOption(value: string, checked: boolean | 'indeterminate') {
 
 <template>
   <div class="space-y-3">
-    <p class="text-sm font-medium">{{ block.prompt }}</p>
+    <div class="flex items-center justify-between">
+      <p class="text-sm font-medium">{{ block.prompt }}</p>
+      <button
+        v-if="interactive && !interacting"
+        @click="toggleSelectAll"
+        class="text-xs text-muted-foreground hover:text-foreground transition-colors underline"
+      >
+        {{ allSelected ? 'Deselect all' : 'Select all' }}
+      </button>
+    </div>
     <div class="space-y-2">
       <div
         v-for="option in block.options"

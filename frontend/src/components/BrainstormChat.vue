@@ -250,6 +250,13 @@ function connectWebSocket() {
 
 function handleServerMessage(data: WSServerMessage) {
   switch (data.type) {
+    case 'user_message_saved':
+      console.log('[WS] User message saved:', (data as any).message)
+      // Add the saved user message to the store
+      store.addMessage((data as any).message)
+      scrollToBottom()
+      break
+
     case 'stream_chunk':
       console.log('[WS] Stream chunk received for message:', data.message_id)
 
@@ -293,27 +300,7 @@ function handleSendMessage() {
   const message = userMessage.value.trim()
   console.log('[WS] Sending message:', message)
 
-  // Add user message to UI immediately
-  const userMessageObj: MessageContent = {
-    blocks: [
-      {
-        id: crypto.randomUUID(),
-        type: 'text',
-        text: message,
-      },
-    ],
-  }
-
-  store.addMessage({
-    id: crypto.randomUUID(),
-    session_id: currentSession.value!.id,
-    role: 'user',
-    content: userMessageObj,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  })
-
-  // Send to WebSocket
+  // Send to WebSocket (backend will send back the saved message)
   const wsMessage: WSUserMessage = {
     type: 'user_message',
     content: message,

@@ -329,7 +329,21 @@ async def handle_user_message(
     )
     db.add(user_message)
     await db.commit()
+    await db.refresh(user_message)
     logger.info(f"[WS] Saved user message")
+
+    # Send the saved user message back to client
+    await websocket.send_json({
+        "type": "user_message_saved",
+        "message": {
+            "id": user_message.id,
+            "session_id": user_message.session_id,
+            "role": user_message.role,
+            "content": user_message.content,
+            "created_at": user_message.created_at.isoformat(),
+            "updated_at": user_message.updated_at.isoformat()
+        }
+    })
 
     # Stream Claude response
     await stream_claude_response(websocket, db, session_id)
@@ -359,7 +373,21 @@ async def handle_interaction(
     )
     db.add(interaction_message)
     await db.commit()
+    await db.refresh(interaction_message)
     logger.info(f"[WS] Saved interaction")
+
+    # Send the saved interaction message back to client
+    await websocket.send_json({
+        "type": "user_message_saved",
+        "message": {
+            "id": interaction_message.id,
+            "session_id": interaction_message.session_id,
+            "role": interaction_message.role,
+            "content": interaction_message.content,
+            "created_at": interaction_message.created_at.isoformat(),
+            "updated_at": interaction_message.updated_at.isoformat()
+        }
+    })
 
     # Stream Claude response
     await stream_claude_response(websocket, db, session_id)

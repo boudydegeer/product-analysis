@@ -1,4 +1,4 @@
-"""Tests for brainstorm models."""
+"""Tests for brainstorm models with JSONB content."""
 import pytest
 from datetime import datetime
 from sqlalchemy import create_engine
@@ -77,3 +77,80 @@ class TestBrainstormSessionModel:
         # Message should be deleted
         deleted_message = session.get(BrainstormMessage, message_id)
         assert deleted_message is None
+
+
+def test_message_accepts_jsonb_content(session):
+    """Message should accept JSONB block structure."""
+    brainstorm_session = BrainstormSession(
+        id="test-session",
+        title="Test",
+        description="Test session",
+        status="active"
+    )
+    session.add(brainstorm_session)
+    session.commit()
+
+    message = BrainstormMessage(
+        id="test-msg",
+        session_id="test-session",
+        role="user",
+        content={
+            "blocks": [
+                {
+                    "id": "block-1",
+                    "type": "text",
+                    "text": "Hello"
+                }
+            ]
+        }
+    )
+    session.add(message)
+    session.commit()
+
+    # Retrieve and verify
+    retrieved = session.query(BrainstormMessage).filter_by(id="test-msg").first()
+    assert retrieved.content["blocks"][0]["text"] == "Hello"
+    assert retrieved.content["blocks"][0]["type"] == "text"
+
+
+def test_message_supports_button_group_block(session):
+    """Message should support button_group block type."""
+    brainstorm_session = BrainstormSession(
+        id="test-session-2",
+        title="Test",
+        description="Test session",
+        status="active"
+    )
+    session.add(brainstorm_session)
+    session.commit()
+
+    message = BrainstormMessage(
+        id="test-msg-2",
+        session_id="test-session-2",
+        role="assistant",
+        content={
+            "blocks": [
+                {
+                    "id": "block-1",
+                    "type": "text",
+                    "text": "Choose platform:"
+                },
+                {
+                    "id": "block-2",
+                    "type": "button_group",
+                    "label": "Platform",
+                    "buttons": [
+                        {"label": "iOS", "value": "ios"},
+                        {"label": "Android", "value": "android"}
+                    ]
+                }
+            ],
+            "metadata": {}
+        }
+    )
+    session.add(message)
+    session.commit()
+
+    retrieved = session.query(BrainstormMessage).filter_by(id="test-msg-2").first()
+    assert retrieved.content["blocks"][1]["type"] == "button_group"
+    assert len(retrieved.content["blocks"][1]["buttons"]) == 2

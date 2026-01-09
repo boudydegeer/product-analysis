@@ -1,10 +1,12 @@
 """Brainstorm session and message models."""
 import enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.types import JSON
 
 from .base import Base, TimestampMixin
 
@@ -52,7 +54,7 @@ class BrainstormSession(Base, TimestampMixin):
 
 
 class BrainstormMessage(Base, TimestampMixin):
-    """Brainstorm message model."""
+    """Brainstorm message model with block-based JSONB content."""
 
     __tablename__ = "brainstorm_messages"
 
@@ -63,7 +65,9 @@ class BrainstormMessage(Base, TimestampMixin):
         nullable=False,
     )
     role: Mapped[MessageRole] = mapped_column(SQLEnum(MessageRole), nullable=False)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[dict[str, Any]] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"), nullable=False
+    )
 
     # Relationships
     session: Mapped["BrainstormSession"] = relationship(

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Check } from 'lucide-vue-next'
 import type { InteractionResponseBlock } from '@/types/brainstorm'
 
 const props = defineProps<{
@@ -8,14 +9,25 @@ const props = defineProps<{
 
 const displayValue = computed(() => {
   if (Array.isArray(props.block.value)) {
-    return props.block.value.join(', ')
+    // Format list nicely
+    const items = props.block.value.map(v =>
+      // Convert kebab-case to Title Case
+      v.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+    )
+    return items.join(', ')
   }
-  return props.block.value
+  // Convert single value kebab-case to Title Case
+  return props.block.value.split('-').map(word =>
+    word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(' ')
 })
+
+const isMultiple = computed(() => Array.isArray(props.block.value))
 </script>
 
 <template>
-  <div class="text-sm">
-    Selected: <span class="font-medium">{{ displayValue }}</span>
+  <div class="flex items-start gap-2 text-sm">
+    <Check class="h-4 w-4 mt-0.5 flex-shrink-0" />
+    <span>{{ displayValue }}</span>
   </div>
 </template>

@@ -12,17 +12,26 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   interact: [blockId: string, value: string[]]
+  skip: []
 }>()
 
 const selected = ref<string[]>([])
+const interacting = ref(false)
 
 function handleSubmit() {
-  if (props.interactive && selected.value.length > 0) {
+  if (props.interactive && selected.value.length > 0 && !interacting.value) {
+    interacting.value = true
     emit('interact', props.block.id, selected.value)
   }
 }
 
+function handleSkip() {
+  emit('skip')
+}
+
 function toggleOption(value: string) {
+  if (interacting.value) return
+
   const index = selected.value.indexOf(value)
   if (index === -1) {
     selected.value.push(value)
@@ -40,7 +49,7 @@ function toggleOption(value: string) {
         <Checkbox
           :id="option.value"
           :checked="selected.includes(option.value)"
-          :disabled="!interactive"
+          :disabled="!interactive || interacting"
           @update:checked="toggleOption(option.value)"
         />
         <div class="grid gap-1.5 leading-none">
@@ -53,12 +62,25 @@ function toggleOption(value: string) {
         </div>
       </div>
     </div>
-    <Button
-      size="sm"
-      :disabled="!interactive || selected.length === 0"
-      @click="handleSubmit"
-    >
-      Submit ({{ selected.length }} selected)
-    </Button>
+    <div class="flex items-center justify-between">
+      <Button
+        size="sm"
+        :disabled="!interactive || selected.length === 0 || interacting"
+        @click="handleSubmit"
+      >
+        Submit ({{ selected.length }} selected)
+      </Button>
+      <Button
+        v-if="interactive && !interacting"
+        variant="ghost"
+        size="sm"
+        @click="handleSkip"
+      >
+        Skip
+      </Button>
+    </div>
+    <div v-if="interacting" class="text-sm text-muted-foreground">
+      Sending...
+    </div>
   </div>
 </template>

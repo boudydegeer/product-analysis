@@ -43,7 +43,8 @@
           <div class="flex items-center gap-2 mb-2">
             <Avatar class="h-6 w-6">
               <AvatarFallback>
-                {{ message.role === 'user' ? 'You' : 'AI' }}
+                <template v-if="message.role === 'user'">You</template>
+                <Bot v-else class="h-4 w-4" />
               </AvatarFallback>
             </Avatar>
             <span class="text-xs font-semibold">
@@ -60,6 +61,7 @@
                 :block="block as any"
                 :interactive="message.role === 'assistant' && index === (currentSession?.messages.length || 0) - 1"
                 @interact="handleInteraction"
+                @skip="handleSkip"
               />
             </template>
           </div>
@@ -71,7 +73,9 @@
         <div class="max-w-[80%] rounded-lg p-4 bg-muted">
           <div class="flex items-center gap-2 mb-2">
             <Avatar class="h-6 w-6">
-              <AvatarFallback>AI</AvatarFallback>
+              <AvatarFallback>
+                <Bot class="h-4 w-4" />
+              </AvatarFallback>
             </Avatar>
             <span class="text-xs font-semibold">Claude</span>
           </div>
@@ -85,9 +89,12 @@
                 :block="block as any"
                 :interactive="interactiveElementsActive"
                 @interact="handleInteraction"
+                @skip="handleSkip"
               />
             </template>
-            <span v-if="store.pendingBlocks.length === 0" class="animate-pulse">▊</span>
+            <div v-if="store.pendingBlocks.length === 0" class="text-sm text-muted-foreground">
+              Claude is thinking...
+            </div>
           </div>
         </div>
       </div>
@@ -110,30 +117,19 @@
           rows="3"
         />
         <Button
-          v-if="!interactiveElementsActive"
           type="submit"
-          :disabled="store.streamingMessageId !== null || loading || !userMessage.trim() || !isActive"
+          :disabled="store.streamingMessageId !== null || loading || !userMessage.trim() || !isActive || interactiveElementsActive"
           size="icon"
           class="self-end"
         >
           <Send class="h-4 w-4" />
-        </Button>
-        <Button
-          v-else
-          type="button"
-          @click="handleSkip"
-          variant="outline"
-          size="icon"
-          class="self-end"
-        >
-          Skip
         </Button>
       </form>
       <p v-if="!isActive" class="text-xs text-muted-foreground mt-2">
         This session is not active
       </p>
       <p v-if="interactiveElementsActive" class="text-xs text-muted-foreground mt-2">
-        Please respond to the interactive element above, or click Skip to continue
+        Please respond to the interactive element above
       </p>
     </div>
   </div>
@@ -147,7 +143,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Send, ArrowLeft } from 'lucide-vue-next'
+import { Send, ArrowLeft, Bot } from 'lucide-vue-next'
 import type { Block, WSServerMessage, WSUserMessage, WSInteraction, MessageContent } from '@/types/brainstorm'
 import TextBlock from '@/components/brainstorm/blocks/TextBlock.vue'
 import ButtonGroupBlock from '@/components/brainstorm/blocks/ButtonGroupBlock.vue'

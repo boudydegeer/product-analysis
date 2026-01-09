@@ -73,8 +73,8 @@ class AgentTypeResponse(BaseModel):
     enabled: bool
     is_default: bool
     version: str
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -163,8 +163,8 @@ class AgentToolConfigResponse(BaseModel):
     allowed_parameters: dict[str, Any] | None
     denied_parameters: dict[str, Any] | None
     parameter_defaults: dict[str, Any] | None
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True

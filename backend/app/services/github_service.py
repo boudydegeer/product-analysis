@@ -75,6 +75,61 @@ class GitHubService:
         """Async context manager exit."""
         await self.close()
 
+    def get_workflow_url(self, run_id: int) -> str:
+        """Get the URL for a workflow run.
+
+        Args:
+            run_id: The workflow run ID.
+
+        Returns:
+            The GitHub Actions URL for the workflow run.
+        """
+        return f"https://github.com/{self.owner}/{self.repo_name}/actions/runs/{run_id}"
+
+    async def trigger_workflow(
+        self,
+        workflow_file: str,
+        inputs: dict[str, str],
+        ref: str = "main",
+    ) -> int:
+        """Trigger a GitHub Actions workflow.
+
+        Args:
+            workflow_file: Name of the workflow file (e.g., "explore-codebase.yml").
+            inputs: Dictionary of workflow inputs.
+            ref: Git ref (branch/tag) to run the workflow on.
+
+        Returns:
+            The workflow run ID.
+
+        Raises:
+            GitHubServiceError: If workflow trigger fails.
+        """
+        url = f"/repos/{self.owner}/{self.repo_name}/actions/workflows/{workflow_file}/dispatches"
+
+        payload = {
+            "ref": ref,
+            "inputs": inputs,
+        }
+
+        try:
+            response = await self._client.post(url, json=payload)
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to trigger workflow {workflow_file}: {e}")
+            raise GitHubServiceError(
+                f"Failed to trigger workflow {workflow_file}: {e}"
+            ) from e
+        except httpx.RequestError as e:
+            logger.error(f"Request error triggering workflow: {e}")
+            raise GitHubServiceError(f"Request error triggering workflow: {e}") from e
+
+        # GitHub dispatch returns 204 No Content on success
+        # We need to get the run_id by listing recent workflow runs
+        run_id = await self._get_latest_workflow_run_id(workflow_file)
+        logger.info(f"Triggered workflow {workflow_file}, run_id={run_id}")
+        return run_id
+
     async def trigger_analysis_workflow(
         self,
         feature_id: UUID,
@@ -96,8 +151,6 @@ class GitHubService:
         Raises:
             GitHubServiceError: If workflow trigger fails.
         """
-        url = f"/repos/{self.owner}/{self.repo_name}/actions/workflows/{self.WORKFLOW_FILE}/dispatches"
-
         inputs = {
             "feature_id": str(feature_id),
             "feature_description": feature_description,
@@ -107,33 +160,23 @@ class GitHubService:
         if callback_url:
             inputs["callback_url"] = callback_url
 
-        payload = {
-            "ref": ref,
-            "inputs": inputs,
-        }
-
-        try:
-            response = await self._client.post(url, json=payload)
-            response.raise_for_status()
-        except httpx.HTTPStatusError as e:
-            logger.error(f"Failed to trigger workflow: {e}")
-            raise GitHubServiceError(
-                f"Failed to trigger workflow for feature {feature_id}: {e}"
-            ) from e
-        except httpx.RequestError as e:
-            logger.error(f"Request error triggering workflow: {e}")
-            raise GitHubServiceError(f"Request error triggering workflow: {e}") from e
-
-        # GitHub dispatch returns 204 No Content on success
-        # We need to get the run_id by listing recent workflow runs
-        run_id = await self._get_latest_workflow_run_id()
+        run_id = await self.trigger_workflow(
+            workflow_file=self.WORKFLOW_FILE,
+            inputs=inputs,
+            ref=ref,
+        )
         logger.info(
             f"Triggered analysis workflow for feature {feature_id}, run_id={run_id}"
         )
         return run_id
 
-    async def _get_latest_workflow_run_id(self) -> int:
+    async def _get_latest_workflow_run_id(
+        self, workflow_file: str | None = None
+    ) -> int:
         """Get the ID of the most recent workflow run.
+
+        Args:
+            workflow_file: Optional workflow file name. Defaults to WORKFLOW_FILE.
 
         Returns:
             The workflow run ID.
@@ -141,7 +184,8 @@ class GitHubService:
         Raises:
             GitHubServiceError: If no workflow runs found.
         """
-        url = f"/repos/{self.owner}/{self.repo_name}/actions/workflows/{self.WORKFLOW_FILE}/runs"
+        workflow = workflow_file or self.WORKFLOW_FILE
+        url = f"/repos/{self.owner}/{self.repo_name}/actions/workflows/{workflow}/runs"
         params = {
             "per_page": 1,
         }

@@ -12,6 +12,7 @@ from app.models.brainstorm import (
 from app.models.idea import Idea, IdeaStatus, IdeaPriority
 from app.models.tool import Tool
 from app.models.agent import AgentType, AgentToolConfig, ToolUsageAudit
+from app.models.codebase_exploration import CodebaseExploration, CodebaseExplorationStatus
 
 __all__ = [
     "Base",
@@ -30,4 +31,6 @@ __all__ = [
     "AgentType",
     "AgentToolConfig",
     "ToolUsageAudit",
+    "CodebaseExploration",
+    "CodebaseExplorationStatus",
 ]

@@ -42,13 +42,31 @@
         >
           <div class="flex items-center gap-2 mb-2">
             <Avatar class="h-6 w-6">
-              <AvatarFallback :class="message.role === 'assistant' ? 'bg-primary/40' : ''">
+              <AvatarFallback
+                :class="message.role === 'assistant' ? '' : ''"
+                :style="message.role === 'assistant' && currentAgentConfig
+                  ? { backgroundColor: currentAgentConfig.avatar_color }
+                  : {}"
+              >
+                <!-- Agent avatar -->
+                <template v-if="message.role === 'assistant' && currentAgentConfig">
+                  <span v-if="isEmoji(currentAgentConfig.avatar_url || '')" class="text-base">
+                    {{ currentAgentConfig.avatar_url }}
+                  </span>
+                  <img
+                    v-else-if="currentAgentConfig.avatar_url"
+                    :src="currentAgentConfig.avatar_url"
+                    alt="avatar"
+                    class="w-full h-full object-cover"
+                  />
+                  <Bot v-else class="h-5 w-5" />
+                </template>
+                <!-- User avatar -->
                 <User v-if="message.role === 'user'" class="h-5 w-5" />
-                <Bot v-else class="h-5 w-5" />
               </AvatarFallback>
             </Avatar>
             <span class="text-xs font-semibold">
-              {{ message.role === 'user' ? 'You' : 'Claude' }}
+              {{ message.role === 'user' ? 'You' : (currentAgentConfig?.display_name || 'Claude') }}
             </span>
           </div>
           <div class="space-y-2">
@@ -73,11 +91,26 @@
         <div class="max-w-[80%] rounded-lg p-4 bg-muted">
           <div class="flex items-center gap-2 mb-2">
             <Avatar class="h-6 w-6">
-              <AvatarFallback class="bg-primary/40">
-                <Bot class="h-5 w-5" />
+              <AvatarFallback
+                :style="currentAgentConfig
+                  ? { backgroundColor: currentAgentConfig.avatar_color }
+                  : { backgroundColor: '#6366f1' }"
+              >
+                <span v-if="currentAgentConfig && isEmoji(currentAgentConfig.avatar_url || '')" class="text-base">
+                  {{ currentAgentConfig.avatar_url }}
+                </span>
+                <img
+                  v-else-if="currentAgentConfig?.avatar_url"
+                  :src="currentAgentConfig.avatar_url"
+                  alt="avatar"
+                  class="w-full h-full object-cover"
+                />
+                <Bot v-else class="h-5 w-5" />
               </AvatarFallback>
             </Avatar>
-            <span class="text-xs font-semibold">Claude</span>
+            <span class="text-xs font-semibold">
+              {{ currentAgentConfig?.display_name || 'Claude' }}
+            </span>
           </div>
           <div class="space-y-2">
             <template
@@ -172,6 +205,7 @@ const currentSession = computed(() => store.currentSession)
 const loading = computed(() => store.loading)
 const isActive = computed(() => store.isActive)
 const interactiveElementsActive = computed(() => store.interactiveElementsActive)
+const currentAgentConfig = computed(() => store.currentAgentConfig)
 
 function getStatusVariant(status: string) {
   switch (status) {
@@ -201,6 +235,10 @@ function getBlockComponent(type: string) {
     default:
       return TextBlock
   }
+}
+
+function isEmoji(str: string): boolean {
+  return /\p{Emoji}/u.test(str)
 }
 
 function connectWebSocket() {
@@ -387,6 +425,10 @@ watch(
 
 onMounted(async () => {
   await store.fetchSession(props.sessionId)
+
+  // Load agent config (default to 'brainstorm')
+  await store.fetchAgentConfig('brainstorm')
+
   connectWebSocket()
   scrollToBottom()
 })

@@ -1,6 +1,7 @@
 """Brainstorm sessions API endpoints."""
 import json
 import logging
+import re
 from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
@@ -27,6 +28,33 @@ logger.warning("🔥 BRAINSTORMS.PY LOADED - VERSION 3.0 WITH FULL LOGGING")
 logger.warning("*" * 60)
 
 router = APIRouter(prefix="/api/v1/brainstorms", tags=["brainstorms"])
+
+
+def extract_json_from_markdown(text: str) -> str:
+    """Extract JSON from markdown code blocks if present.
+
+    Args:
+        text: Text that may contain JSON in markdown code blocks
+
+    Returns:
+        Extracted JSON string or original text if no code blocks found
+    """
+    # Try to find JSON in ```json ... ``` blocks
+    json_block_pattern = r'```(?:json)?\s*(\{[\s\S]*?\})\s*```'
+    match = re.search(json_block_pattern, text, re.MULTILINE | re.DOTALL)
+
+    if match:
+        return match.group(1)
+
+    # Try to find JSON in ```...``` blocks (without language specifier)
+    code_block_pattern = r'```\s*(\{[\s\S]*?\})\s*```'
+    match = re.search(code_block_pattern, text, re.MULTILINE | re.DOTALL)
+
+    if match:
+        return match.group(1)
+
+    # Return as-is if no code blocks found
+    return text
 
 
 @router.get("/debug/version")
@@ -374,7 +402,9 @@ async def stream_claude_response(
             # Parse JSON response
             response_data = None
             try:
-                response_data = json.loads(full_response)
+                # Extract JSON from markdown code blocks if present
+                json_text = extract_json_from_markdown(full_response)
+                response_data = json.loads(json_text)
                 blocks = response_data.get("blocks", [])
 
                 # Send blocks incrementally
@@ -386,9 +416,9 @@ async def stream_claude_response(
                     })
                     collected_blocks.append(block)
 
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 # Fallback: treat as plain text
-                logger.warning("[WS] Claude response not valid JSON, treating as text")
+                logger.warning(f"[WS] Claude response not valid JSON: {e}, treating as text")
                 text_block = {
                     "id": str(uuid4()),
                     "type": "text",

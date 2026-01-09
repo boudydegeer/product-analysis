@@ -55,7 +55,63 @@ This document tracks known issues and limitations in the Product Analysis Platfo
 - No known issues
 
 ### Module 2: Brainstorming Sessions
-- No known issues
+
+#### Interactive Elements Not Consistently Rendered
+
+**Issue**: Claude sometimes returns interactive button_group elements as JSON code blocks in text instead of proper structured blocks.
+
+**Status**: Behavioral Limitation
+
+**Details**:
+- Manual E2E testing completed on 2026-01-09
+- WebSocket connection: ✅ Working correctly
+- Message persistence: ✅ Blocks structure saved to database correctly
+- Claude responses: ✅ Streaming responses received
+- Interactive blocks: ⚠️ Inconsistent format
+
+**Observed Behavior**:
+When asked "Can you suggest some features for a mobile app?", Claude responded with:
+- Text content with JSON code block containing button_group structure
+- Instead of returning proper structured blocks like:
+  ```json
+  [
+    {"type": "text", "text": "..."},
+    {"type": "button_group", "buttons": [...]}
+  ]
+  ```
+- Claude returned:
+  ```
+  "I'd love to help! ```json\n[...button_group...]```"
+  ```
+
+**Root Cause**:
+- System prompt instructs Claude to return JSON array of blocks
+- Claude understood the intent but chose to embed the JSON in a markdown code block
+- This is a model behavior issue, not a code bug
+- The current system prompt may need reinforcement about strict JSON structure
+
+**Impact**:
+- Interactive elements may not render in the UI
+- Users see JSON code instead of clickable buttons
+- Workaround: Users can read the options and type their choice manually
+
+**Possible Solutions**:
+1. Enhance system prompt with more explicit JSON formatting requirements
+2. Add post-processing to extract JSON from code blocks
+3. Use few-shot examples in the system prompt showing exact expected format
+4. Add validation layer that rejects non-conforming responses
+
+**Test Results** (2026-01-09):
+- ✅ Backend startup successful (port 8891)
+- ✅ Frontend startup successful (port 8892)
+- ✅ WebSocket connection established
+- ✅ Text message sent successfully
+- ✅ Claude response received (973 chars)
+- ✅ Messages persisted to database with blocks structure
+- ✅ Database query confirms proper JSONB storage
+- ⚠️ Interactive blocks embedded in text instead of structured blocks
+- ℹ️ Skip button not tested (no interaction elements rendered)
+- ℹ️ Page refresh persistence not tested (requires UI interaction)
 
 ### Module 4: Brainstorming Sessions
 - Not yet implemented

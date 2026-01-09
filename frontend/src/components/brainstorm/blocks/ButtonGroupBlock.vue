@@ -41,10 +41,10 @@ function handleSkip() {
     <div class="grid grid-cols-2 gap-2">
       <Button
         v-for="button in block.buttons"
-        :key="button.value"
+        :key="button.id"
         :variant="button.style === 'primary' ? 'default' : 'outline'"
         :disabled="!interactive || interacting"
-        @click="handleClick(button.value)"
+        @click="handleClick(button.id)"
         class="w-full"
       >
         {{ button.label }}

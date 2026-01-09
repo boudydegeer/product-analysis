@@ -16,8 +16,8 @@ export interface TextBlock extends BaseBlock {
 }
 
 export interface ButtonOption {
+  id: string
   label: string
-  value: string
   style?: 'primary' | 'secondary' | 'outline'
 }
 

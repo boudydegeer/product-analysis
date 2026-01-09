@@ -80,15 +80,14 @@ function toggleOption(value: string, checked: boolean | 'indeterminate') {
         @click="(!interactive || interacting) ? null : toggleOption(option.id, !isChecked(option.id))"
       >
         <Checkbox
-          :id="option.id"
           :model-value="isChecked(option.id)"
           :disabled="true"
           @click.stop.prevent
         />
         <div class="grid gap-1.5 leading-none flex-1">
-          <Label :for="option.id" class="text-sm font-normal">
+          <div class="text-sm font-normal">
             {{ option.label }}
-          </Label>
+          </div>
           <p v-if="option.description" class="text-xs text-muted-foreground">
             {{ option.description }}
           </p>

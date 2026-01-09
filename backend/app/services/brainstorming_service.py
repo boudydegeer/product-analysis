@@ -1,9 +1,12 @@
 """Service for AI-powered brainstorming with Claude Agent SDK."""
 import logging
 import os
-from typing import AsyncGenerator, Any
+from typing import AsyncGenerator, Any, TYPE_CHECKING
 from claude_agent_sdk import ClaudeSDKClient
 from claude_agent_sdk.types import ClaudeAgentOptions
+
+if TYPE_CHECKING:
+    from app.services.agent_factory import AgentFactory
 
 logger = logging.getLogger(__name__)
 
@@ -265,7 +268,7 @@ You have access to WebSearch and WebFetch tools for research."""
     def __init__(
         self,
         api_key: str,
-        agent_factory: "AgentFactory" = None,
+        agent_factory: "AgentFactory | None" = None,
         agent_name: str = "brainstorm",
         model: str = "claude-sonnet-4-5"
     ) -> None:
@@ -301,7 +304,7 @@ You have access to WebSearch and WebFetch tools for research."""
                 self.client = await self.agent_factory.create_agent_client(self.agent_name)
             else:
                 # Fallback: Create client with static config (backwards compatibility)
-                logger.warning(f"[SERVICE] Creating client with static config (no AgentFactory)")
+                logger.warning("[SERVICE] Creating client with static config (no AgentFactory)")
                 options = ClaudeAgentOptions(
                     model=self.model,
                     system_prompt=self.SYSTEM_PROMPT,
@@ -360,7 +363,7 @@ You have access to WebSearch and WebFetch tools for research."""
 
                 # Check if this is the final ResultMessage - break out of loop
                 if message_type == 'ResultMessage':
-                    logger.warning(f"[BRAINSTORM] 🏁 Received ResultMessage - stream complete, breaking loop")
+                    logger.warning("[BRAINSTORM] 🏁 Received ResultMessage - stream complete, breaking loop")
                     break
 
                 # Extract text from different message types

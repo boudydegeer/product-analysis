@@ -1,10 +1,14 @@
 """Tool model for dynamic tool management."""
 from datetime import datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import String, Text, Boolean, Integer, DateTime, Index, func
 from sqlalchemy.types import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
+
+if TYPE_CHECKING:
+    from app.models.agent import AgentToolConfig
 
 
 class Tool(Base):

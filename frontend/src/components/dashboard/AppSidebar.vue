@@ -86,6 +86,11 @@ const data = {
       url: '/settings',
       icon: Settings,
     },
+    {
+      title: 'Admin',
+      url: '/admin',
+      icon: Settings2,
+    },
   ],
   projects: [
     {

@@ -57,6 +57,12 @@ const routes: RouteRecordRaw[] = [
         name: 'idea-detail',
         component: () => import('@/views/IdeaDetailView.vue'),
         meta: { title: 'Idea Details' },
+      },
+      {
+        path: 'admin',
+        name: 'admin',
+        component: () => import('@/views/AdminView.vue'),
+        meta: { title: 'Admin Panel' },
       }
     ]
   }

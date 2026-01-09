@@ -13,7 +13,6 @@ from app.models.brainstorm import (
     BrainstormSession,
     BrainstormSessionStatus,
     BrainstormMessage,
-    MessageRole,
 )
 from app.schemas.brainstorm import (
     BrainstormSessionCreate,
@@ -310,7 +309,7 @@ async def websocket_brainstorm(
                     "type": "error",
                     "message": str(e)
                 })
-            except:
+            except Exception:
                 pass
 
 
@@ -338,7 +337,7 @@ async def handle_user_message(
     db.add(user_message)
     await db.commit()
     await db.refresh(user_message)
-    logger.info(f"[WS] Saved user message")
+    logger.info("[WS] Saved user message")
 
     # Send the saved user message back to client
     await websocket.send_json({
@@ -383,7 +382,7 @@ async def handle_interaction(
     db.add(interaction_message)
     await db.commit()
     await db.refresh(interaction_message)
-    logger.info(f"[WS] Saved interaction")
+    logger.info("[WS] Saved interaction")
 
     # Send the saved interaction message back to client
     await websocket.send_json({
@@ -579,7 +578,7 @@ async def stream_claude_response(
                 "type": "stream_complete",
                 "message_id": message_id
             })
-            logger.info(f"[WS] Stream complete")
+            logger.info("[WS] Stream complete")
 
         except Exception as e:
             logger.error(f"[WS] Error streaming: {e}", exc_info=True)

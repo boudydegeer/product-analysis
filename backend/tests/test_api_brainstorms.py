@@ -29,12 +29,16 @@ class TestCreateBrainstormSession:
 
     @pytest.mark.asyncio
     async def test_create_session_missing_title(self, async_client: AsyncClient):
-        """Test creating session without title fails."""
+        """Test creating session without title uses default title."""
         data = {"description": "Test description"}
 
         response = await async_client.post("/api/v1/brainstorms", json=data)
 
-        assert response.status_code == 422
+        # Title is optional, defaults to "New Brainstorm"
+        assert response.status_code == 201
+        result = response.json()
+        assert result["title"] == "New Brainstorm"
+        assert result["description"] == "Test description"
 
 
 class TestGetBrainstormSession:

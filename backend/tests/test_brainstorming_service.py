@@ -1,6 +1,5 @@
 """Tests for brainstorming service JSON responses."""
 import pytest
-import json
 from app.services.brainstorming_service import BrainstormingService
 
 

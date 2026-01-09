@@ -3,10 +3,9 @@ import logging
 from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.models.tool import Tool
-from app.models.agent import AgentType, AgentToolConfig, ToolUsageAudit
+from app.models.agent import AgentToolConfig, ToolUsageAudit
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +38,8 @@ class ToolsService:
 
         if enabled_only:
             query = query.where(
-                Tool.enabled == True,
-                AgentToolConfig.enabled_for_agent == True
+                Tool.enabled.is_(True),
+                AgentToolConfig.enabled_for_agent.is_(True)
             )
 
         query = query.order_by(AgentToolConfig.order_index)
@@ -135,8 +134,8 @@ class ToolsService:
             .where(
                 AgentToolConfig.agent_type_id == agent_type_id,
                 Tool.name == tool_name,
-                AgentToolConfig.enabled_for_agent == True,
-                AgentToolConfig.allow_use == True
+                AgentToolConfig.enabled_for_agent.is_(True),
+                AgentToolConfig.allow_use.is_(True)
             )
         )
 

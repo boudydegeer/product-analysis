@@ -114,7 +114,7 @@ class AgentToolConfig(Base):
 
     # Relationships
     agent_type: Mapped["AgentType"] = relationship("AgentType", back_populates="tool_configs")
-    tool: Mapped["Tool"] = relationship("Tool", back_populates="agent_configs")
+    tool: Mapped["Tool"] = relationship("Tool", back_populates="agent_configs")  # noqa: F821
 
     __table_args__ = (
         UniqueConstraint("agent_type_id", "tool_id", name="uq_agent_tool"),

@@ -1,6 +1,5 @@
 """Tests for Tool model."""
 import pytest
-from sqlalchemy import select
 from app.models.tool import Tool
 
 

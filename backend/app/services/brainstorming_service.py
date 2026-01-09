@@ -268,7 +268,7 @@ You have access to WebSearch and WebFetch tools for research."""
     def __init__(
         self,
         api_key: str,
-        agent_factory: "AgentFactory | None" = None,
+        agent_factory: "AgentFactory | None" = None,  # noqa: F821
         agent_name: str = "brainstorm",
         model: str = "claude-sonnet-4-5"
     ) -> None:

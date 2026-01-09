@@ -42,11 +42,17 @@ def test_message_response_schema():
         "id": "msg-1",
         "session_id": "session-1",
         "role": "user",
-        "content": "Hello",
+        "content": {
+            "blocks": [{
+                "id": "block-1",
+                "type": "text",
+                "text": "Hello"
+            }]
+        },
         "created_at": datetime.now(),
         "updated_at": datetime.now(),
     }
 
     schema = BrainstormMessageResponse(**data)
     assert schema.role == "user"
-    assert schema.content == "Hello"
+    assert schema.content["blocks"][0]["text"] == "Hello"

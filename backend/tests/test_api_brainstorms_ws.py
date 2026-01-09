@@ -19,7 +19,7 @@ async def test_websocket_accepts_connection(db_session):
     await db_session.commit()
 
     client = TestClient(app)
-    with client.websocket_connect(f"/api/v1/brainstorms/ws/ws-test-session") as websocket:
+    with client.websocket_connect("/api/v1/brainstorms/ws/ws-test-session") as websocket:
         # Connection successful if no exception
         assert websocket is not None
 
@@ -28,7 +28,7 @@ async def test_websocket_accepts_connection(db_session):
 async def test_websocket_rejects_nonexistent_session():
     """WebSocket should reject connections to non-existent sessions."""
     client = TestClient(app)
-    with client.websocket_connect(f"/api/v1/brainstorms/ws/nonexistent-session") as websocket:
+    with client.websocket_connect("/api/v1/brainstorms/ws/nonexistent-session") as websocket:
         data = websocket.receive_json()
         assert data["type"] == "error"
         assert "not found" in data["message"].lower()
@@ -47,7 +47,7 @@ async def test_websocket_handles_user_message(db_session):
     await db_session.commit()
 
     client = TestClient(app)
-    with client.websocket_connect(f"/api/v1/brainstorms/ws/msg-test-session") as websocket:
+    with client.websocket_connect("/api/v1/brainstorms/ws/msg-test-session") as websocket:
         # Send user message
         websocket.send_json({
             "type": "user_message",
@@ -62,9 +62,7 @@ async def test_websocket_handles_user_message(db_session):
 @pytest.mark.asyncio
 async def test_handles_malformed_json_gracefully():
     """Should fallback to text block when Claude returns invalid JSON."""
-    import json
     from unittest.mock import AsyncMock, MagicMock, patch
-    from uuid import uuid4
 
     # Test the JSON parsing logic directly
     from app.api.brainstorms import stream_claude_response

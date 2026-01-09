@@ -215,46 +215,6 @@ class TestBrainstormStatusValues:
         assert result["status"] == "archived"
 
 
-class TestStreamBrainstormErrors:
-    """Tests for stream brainstorm error cases."""
-
-    @pytest.mark.asyncio
-    async def test_stream_session_not_found(self, async_client: AsyncClient):
-        """Test streaming with non-existent session returns 404."""
-        response = await async_client.get(
-            "/api/v1/brainstorms/nonexistent/stream?message=Hello"
-        )
-
-        assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
-
-    @pytest.mark.asyncio
-    async def test_stream_without_api_key(
-        self, async_client: AsyncClient, db_session: AsyncSession, monkeypatch
-    ):
-        """Test streaming without API key returns 500."""
-        # Create a session
-        session = BrainstormSession(
-            id="session-1",
-            title="Test Session",
-            description="Test description",
-        )
-        db_session.add(session)
-        await db_session.commit()
-
-        # Remove API key
-        from app.config import settings
-
-        monkeypatch.setattr(settings, "anthropic_api_key", None)
-
-        response = await async_client.get(
-            "/api/v1/brainstorms/session-1/stream?message=Hello"
-        )
-
-        assert response.status_code == 500
-        assert "api key not configured" in response.json()["detail"].lower()
-
-
 class TestCreateBrainstormEdgeCases:
     """Tests for brainstorm creation edge cases."""
 

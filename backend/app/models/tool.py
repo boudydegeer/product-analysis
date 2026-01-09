@@ -52,7 +52,7 @@ class Tool(Base):
     created_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Relationships
-    agent_configs: Mapped[list["AgentToolConfig"]] = relationship(
+    agent_configs: Mapped[list["AgentToolConfig"]] = relationship(  # noqa: F821
         "AgentToolConfig", back_populates="tool", cascade="all, delete-orphan"
     )
 

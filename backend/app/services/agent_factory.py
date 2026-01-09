@@ -113,7 +113,7 @@ class AgentFactory:
         query = select(AgentType)
 
         if enabled_only:
-            query = query.where(AgentType.enabled == True)
+            query = query.where(AgentType.enabled.is_(True))
 
         result = await self.db.execute(query)
         agents = result.scalars().all()

@@ -8,11 +8,12 @@ from pathlib import Path
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from sqlalchemy import select
-from app.database import async_session_maker
-from app.models.agent import AgentType, AgentToolConfig
-from app.models.tool import Tool
-from app.services.brainstorming_service import BrainstormingService
+# Import after path modification - this is intentional
+from sqlalchemy import select  # noqa: E402
+from app.database import async_session_maker  # noqa: E402
+from app.models.agent import AgentType, AgentToolConfig  # noqa: E402
+from app.models.tool import Tool  # noqa: E402
+from app.services.brainstorming_service import BrainstormingService  # noqa: E402
 
 
 async def seed_default_tools(db):

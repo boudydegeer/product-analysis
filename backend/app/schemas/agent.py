@@ -71,7 +71,7 @@ class AgentUpdate(BaseModel):
 class AgentResponse(AgentBase):
     """Schema for Agent response with all fields."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, json_encoders={datetime: lambda v: v.isoformat()})
 
     id: int
     avatar_url: Optional[str] = None

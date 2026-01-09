@@ -50,12 +50,23 @@
               {{ message.role === 'user' ? 'You' : 'Claude' }}
             </span>
           </div>
-          <p class="whitespace-pre-wrap">{{ message.content }}</p>
+          <div class="space-y-2">
+            <template
+              v-for="block in message.content.blocks.filter(b => b.type !== 'interaction_response')"
+              :key="block.id"
+            >
+              <component
+                :is="getBlockComponent(block.type)"
+                :block="block as any"
+                :interactive="false"
+              />
+            </template>
+          </div>
         </div>
       </div>
 
       <!-- Streaming Message -->
-      <div v-if="streaming" class="flex justify-start">
+      <div v-if="store.streamingMessageId" class="flex justify-start">
         <div class="max-w-[80%] rounded-lg p-4 bg-muted">
           <div class="flex items-center gap-2 mb-2">
             <Avatar class="h-6 w-6">
@@ -63,10 +74,20 @@
             </Avatar>
             <span class="text-xs font-semibold">Claude</span>
           </div>
-          <p class="whitespace-pre-wrap">
-            {{ streamingContent }}
-            <span class="animate-pulse">▊</span>
-          </p>
+          <div class="space-y-2">
+            <template
+              v-for="block in store.pendingBlocks.filter(b => b.type !== 'interaction_response')"
+              :key="block.id"
+            >
+              <component
+                :is="getBlockComponent(block.type)"
+                :block="block as any"
+                :interactive="interactiveElementsActive"
+                @interact="handleInteraction"
+              />
+            </template>
+            <span v-if="store.pendingBlocks.length === 0" class="animate-pulse">▊</span>
+          </div>
         </div>
       </div>
 
@@ -82,22 +103,36 @@
         <Textarea
           v-model="userMessage"
           placeholder="Share your thoughts..."
-          :disabled="streaming || loading || !isActive"
+          :disabled="store.streamingMessageId !== null || loading || !isActive || interactiveElementsActive"
           @keydown.enter.exact.prevent="handleSendMessage"
           class="flex-1 resize-none"
           rows="3"
         />
         <Button
+          v-if="!interactiveElementsActive"
           type="submit"
-          :disabled="streaming || loading || !userMessage.trim() || !isActive"
+          :disabled="store.streamingMessageId !== null || loading || !userMessage.trim() || !isActive"
           size="icon"
           class="self-end"
         >
           <Send class="h-4 w-4" />
         </Button>
+        <Button
+          v-else
+          type="button"
+          @click="handleSkip"
+          variant="outline"
+          size="icon"
+          class="self-end"
+        >
+          Skip
+        </Button>
       </form>
       <p v-if="!isActive" class="text-xs text-muted-foreground mt-2">
         This session is not active
+      </p>
+      <p v-if="interactiveElementsActive" class="text-xs text-muted-foreground mt-2">
+        Please respond to the interactive element above, or click Skip to continue
       </p>
     </div>
   </div>
@@ -107,13 +142,15 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBrainstormStore } from '@/stores/brainstorm'
-import { brainstormsApi } from '@/api/brainstorms'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Send, ArrowLeft } from 'lucide-vue-next'
-import type { StreamChunk } from '@/types/brainstorm'
+import type { Block, WSServerMessage, WSUserMessage, WSInteraction, MessageContent } from '@/types/brainstorm'
+import TextBlock from '@/components/brainstorm/blocks/TextBlock.vue'
+import ButtonGroupBlock from '@/components/brainstorm/blocks/ButtonGroupBlock.vue'
+import MultiSelectBlock from '@/components/brainstorm/blocks/MultiSelectBlock.vue'
 
 const props = defineProps<{
   sessionId: string
@@ -123,13 +160,12 @@ const router = useRouter()
 const store = useBrainstormStore()
 const userMessage = ref('')
 const messagesContainer = ref<HTMLDivElement>()
-const currentEventSource = ref<EventSource | null>(null)
+const ws = ref<WebSocket | null>(null)
 
 const currentSession = computed(() => store.currentSession)
 const loading = computed(() => store.loading)
-const streaming = computed(() => store.streaming)
-const streamingContent = computed(() => store.streamingContent)
 const isActive = computed(() => store.isActive)
+const interactiveElementsActive = computed(() => store.interactiveElementsActive)
 
 function getStatusVariant(status: string) {
   switch (status) {
@@ -146,111 +182,170 @@ function getStatusVariant(status: string) {
   }
 }
 
-function cleanupEventSource() {
-  console.log('[FRONTEND] cleanupEventSource called')
-  if (currentEventSource.value) {
-    console.log('[FRONTEND] Closing EventSource')
-    currentEventSource.value.close()
-    currentEventSource.value = null
+function getBlockComponent(type: string) {
+  switch (type) {
+    case 'text':
+      return TextBlock
+    case 'button_group':
+      return ButtonGroupBlock
+    case 'multi_select':
+      return MultiSelectBlock
+    default:
+      return TextBlock
   }
-  console.log('[FRONTEND] Setting streaming = false')
-  store.setStreaming(false)
 }
 
-async function handleSendMessage() {
-  console.log('[FRONTEND] handleSendMessage called')
-  if (!userMessage.value.trim() || !currentSession.value) {
-    console.log('[FRONTEND] Early return: empty message or no session')
+function connectWebSocket() {
+  if (!currentSession.value) {
+    console.error('[WS] Cannot connect: no session')
     return
   }
 
-  const message = userMessage.value
-  console.log('[FRONTEND] Message:', message, 'Session:', currentSession.value.id)
-  userMessage.value = ''
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const host = import.meta.env.VITE_API_URL?.replace(/^https?:\/\//, '') || 'localhost:8891'
+  const wsUrl = `${protocol}//${host}/api/brainstorms/${currentSession.value.id}/ws`
+
+  console.log('[WS] Connecting to:', wsUrl)
+
+  try {
+    ws.value = new WebSocket(wsUrl)
+
+    ws.value.onopen = () => {
+      console.log('[WS] Connected')
+      store.setWsConnected(true)
+    }
+
+    ws.value.onmessage = (event) => {
+      console.log('[WS] Received message:', event.data)
+      try {
+        const data: WSServerMessage = JSON.parse(event.data)
+        handleServerMessage(data)
+      } catch (error) {
+        console.error('[WS] Failed to parse message:', error, 'Raw:', event.data)
+      }
+    }
+
+    ws.value.onerror = (error) => {
+      console.error('[WS] Error:', error)
+      store.setWsConnected(false)
+    }
+
+    ws.value.onclose = () => {
+      console.log('[WS] Disconnected')
+      store.setWsConnected(false)
+    }
+  } catch (error) {
+    console.error('[WS] Failed to create WebSocket:', error)
+    store.setWsConnected(false)
+  }
+}
+
+function handleServerMessage(data: WSServerMessage) {
+  switch (data.type) {
+    case 'stream_chunk':
+      console.log('[WS] Stream chunk received for message:', data.message_id)
+
+      // Start streaming if not already started
+      if (!store.streamingMessageId) {
+        store.startStreamingMessage(data.message_id)
+      }
+
+      // Append block to pending blocks
+      store.appendBlock(data.block)
+      scrollToBottom()
+      break
+
+    case 'stream_complete':
+      console.log('[WS] Stream complete for message:', data.message_id)
+      store.completeStreamingMessage()
+      scrollToBottom()
+      break
+
+    case 'error':
+      console.error('[WS] Server error:', data.message)
+      store.clearInteractiveState()
+      break
+
+    default:
+      console.warn('[WS] Unknown message type:', (data as any).type)
+  }
+}
+
+function handleSendMessage() {
+  if (!userMessage.value.trim() || !ws.value || ws.value.readyState !== WebSocket.OPEN) {
+    console.log('[WS] Cannot send: empty message or WebSocket not open')
+    return
+  }
+
+  const message = userMessage.value.trim()
+  console.log('[WS] Sending message:', message)
 
   // Add user message to UI immediately
-  console.log('[FRONTEND] Adding user message to store')
+  const userMessageObj: MessageContent = {
+    blocks: [
+      {
+        id: crypto.randomUUID(),
+        type: 'text',
+        text: message,
+      },
+    ],
+  }
+
   store.addMessage({
     id: crypto.randomUUID(),
-    session_id: currentSession.value.id,
+    session_id: currentSession.value!.id,
     role: 'user',
-    content: message,
+    content: userMessageObj,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   })
 
-  // Cleanup any existing connection
-  console.log('[FRONTEND] Cleaning up existing EventSource')
-  cleanupEventSource()
-
-  let eventSource: EventSource | null = null
-
-  try {
-    console.log('[FRONTEND] Setting streaming = true')
-    store.setStreaming(true)
-    store.clearStreamingContent()
-
-    console.log('[FRONTEND] Creating EventSource...')
-    eventSource = brainstormsApi.streamBrainstorm(
-      currentSession.value.id,
-      message
-    )
-    currentEventSource.value = eventSource
-    console.log('[FRONTEND] EventSource created, URL:', eventSource.url)
-
-    eventSource.addEventListener('message', (event: MessageEvent) => {
-      console.log('[FRONTEND] Received SSE message:', event.data)
-      try {
-        const data: StreamChunk = JSON.parse(event.data)
-        console.log('[FRONTEND] Parsed data:', data)
-
-        if (data.type === 'chunk' && data.content) {
-          console.log('[FRONTEND] Chunk received, length:', data.content.length)
-          store.appendStreamingContent(data.content)
-          scrollToBottom()
-        } else if (data.type === 'done') {
-          console.log('[FRONTEND] Stream completed, adding assistant message')
-
-          // Add assistant message to UI
-          if (streamingContent.value) {
-            store.addMessage({
-              id: crypto.randomUUID(),
-              session_id: currentSession.value!.id,
-              role: 'assistant',
-              content: streamingContent.value,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-          }
-
-          // Clear streaming state and cleanup
-          store.clearStreamingContent()
-          cleanupEventSource()
-
-          console.log('Assistant message added, input should be re-enabled')
-        } else if (data.type === 'error') {
-          console.error('[FRONTEND] Streaming error from server:', data.message)
-          cleanupEventSource()
-        }
-      } catch (parseError) {
-        console.error('[FRONTEND] Failed to parse SSE message:', parseError, 'Raw data:', event.data)
-        cleanupEventSource()
-      }
-    })
-
-    eventSource.addEventListener('error', (error) => {
-      console.error('[FRONTEND] EventSource connection failed:', error)
-      console.error('[FRONTEND] EventSource readyState:', eventSource?.readyState)
-      cleanupEventSource()
-    })
-
-    eventSource.addEventListener('open', () => {
-      console.log('[FRONTEND] EventSource connection opened successfully')
-    })
-  } catch (error) {
-    console.error('[FRONTEND] Failed to send message (caught exception):', error)
-    cleanupEventSource()
+  // Send to WebSocket
+  const wsMessage: WSUserMessage = {
+    type: 'user_message',
+    content: message,
   }
+
+  ws.value.send(JSON.stringify(wsMessage))
+  userMessage.value = ''
+
+  // Clear interactive state since we're sending a new message
+  store.clearInteractiveState()
+  scrollToBottom()
+}
+
+function handleInteraction(blockId: string, value: string | string[]) {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
+    console.error('[WS] Cannot send interaction: WebSocket not open')
+    return
+  }
+
+  console.log('[WS] Sending interaction:', blockId, value)
+
+  const interaction: WSInteraction = {
+    type: 'interaction',
+    block_id: blockId,
+    value,
+  }
+
+  ws.value.send(JSON.stringify(interaction))
+
+  // Clear interactive state since we've responded
+  store.clearInteractiveState()
+}
+
+function handleSkip() {
+  console.log('[WS] Skipping interactive elements')
+  store.clearInteractiveState()
+}
+
+function cleanup() {
+  console.log('[WS] Cleanup called')
+  if (ws.value) {
+    ws.value.close()
+    ws.value = null
+  }
+  store.setWsConnected(false)
 }
 
 function scrollToBottom() {
@@ -268,14 +363,20 @@ watch(
   }
 )
 
+watch(
+  () => store.pendingBlocks.length,
+  () => {
+    scrollToBottom()
+  }
+)
+
 onMounted(async () => {
   await store.fetchSession(props.sessionId)
+  connectWebSocket()
   scrollToBottom()
 })
 
 onBeforeUnmount(() => {
-  // Cleanup EventSource when component is destroyed
-  cleanupEventSource()
-  store.clearStreamingContent()
+  cleanup()
 })
 </script>

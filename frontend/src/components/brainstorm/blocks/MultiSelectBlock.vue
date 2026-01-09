@@ -35,7 +35,9 @@ function handleSkip() {
 }
 
 function isChecked(value: string) {
-  return selected.value.includes(value)
+  const result = selected.value.includes(value)
+  console.log('[MultiSelectBlock] isChecked:', value, '=', result, 'selected:', [...selected.value])
+  return result
 }
 
 function toggleOption(value: string, checked: boolean | 'indeterminate') {
@@ -70,15 +72,21 @@ function toggleOption(value: string, checked: boolean | 'indeterminate') {
   <div class="space-y-3">
     <p class="text-sm font-medium">{{ block.label }}</p>
     <div class="space-y-2">
-      <div v-for="option in block.options" :key="option.value" class="flex items-start gap-2">
+      <div
+        v-for="option in block.options"
+        :key="option.value"
+        class="flex items-start gap-2 cursor-pointer hover:bg-accent/50 p-2 rounded-md transition-colors"
+        :class="{ 'opacity-50 cursor-not-allowed': !interactive || interacting }"
+        @click="(!interactive || interacting) ? null : toggleOption(option.value, !isChecked(option.value))"
+      >
         <Checkbox
           :id="option.value"
           :model-value="isChecked(option.value)"
-          :disabled="!interactive || interacting"
-          @update:model-value="(checked) => toggleOption(option.value, checked)"
+          :disabled="true"
+          @click.stop.prevent
         />
-        <div class="grid gap-1.5 leading-none">
-          <Label :for="option.value" class="text-sm font-normal cursor-pointer">
+        <div class="grid gap-1.5 leading-none flex-1">
+          <Label :for="option.value" class="text-sm font-normal">
             {{ option.label }}
           </Label>
           <p v-if="option.description" class="text-xs text-muted-foreground">

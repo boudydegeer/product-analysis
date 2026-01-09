@@ -153,6 +153,11 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
       return
     }
 
+    // Check if we had interactive blocks
+    const hadInteractiveBlocks = pendingBlocks.value.some(
+      b => b.type === 'button_group' || b.type === 'multi_select'
+    )
+
     // Create the complete message
     const message: Message = {
       id: streamingMessageId.value,
@@ -171,6 +176,12 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
     // Clear streaming state
     streamingMessageId.value = null
     pendingBlocks.value = []
+
+    // Keep interactiveElementsActive if we had interactive blocks
+    // This will be cleared when user interacts or sends a new message
+    if (!hadInteractiveBlocks) {
+      interactiveElementsActive.value = false
+    }
   }
 
   function clearInteractiveState() {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -19,8 +19,12 @@ const emit = defineEmits<{
 const selected = ref<string[]>([])
 const interacting = ref(false)
 
+const selectedCount = computed(() => selected.value.length)
+const canSubmit = computed(() => props.interactive && selectedCount.value > 0 && !interacting.value)
+
 function handleSubmit() {
-  if (props.interactive && selected.value.length > 0 && !interacting.value) {
+  if (canSubmit.value) {
+    console.log('[MultiSelectBlock] Submitting with selected:', selected.value)
     interacting.value = true
     emit('interact', props.block.id, selected.value)
   }
@@ -30,28 +34,35 @@ function handleSkip() {
   emit('skip')
 }
 
-function toggleOption(value: string, checked: boolean) {
+function isChecked(value: string) {
+  return selected.value.includes(value)
+}
+
+function toggleOption(value: string, checked: boolean | 'indeterminate') {
   console.log('[MultiSelectBlock] toggleOption called:', {
     value,
     checked,
     interactive: props.interactive,
     interacting: interacting.value,
-    currentSelected: selected.value
+    currentSelected: [...selected.value]
   })
 
-  if (interacting.value) return
+  if (interacting.value || !props.interactive) return
+
+  const isBoolean = typeof checked === 'boolean'
+  if (!isBoolean) return
 
   if (checked) {
-    // Add to selection - create new array to trigger reactivity
+    // Add to selection
     if (!selected.value.includes(value)) {
       selected.value = [...selected.value, value]
     }
   } else {
-    // Remove from selection - create new array to trigger reactivity
+    // Remove from selection
     selected.value = selected.value.filter(v => v !== value)
   }
 
-  console.log('[MultiSelectBlock] After toggle, selected:', selected.value)
+  console.log('[MultiSelectBlock] After toggle, selected:', [...selected.value], 'count:', selected.value.length)
 }
 </script>
 
@@ -62,9 +73,9 @@ function toggleOption(value: string, checked: boolean) {
       <div v-for="option in block.options" :key="option.value" class="flex items-start gap-2">
         <Checkbox
           :id="option.value"
-          :checked="selected.includes(option.value)"
+          :checked="isChecked(option.value)"
           :disabled="!interactive || interacting"
-          @update:checked="(checked: boolean) => toggleOption(option.value, checked)"
+          @update:checked="(checked) => toggleOption(option.value, checked)"
         />
         <div class="grid gap-1.5 leading-none">
           <Label :for="option.value" class="text-sm font-normal cursor-pointer">
@@ -91,10 +102,10 @@ function toggleOption(value: string, checked: boolean) {
 
         <Button
           size="sm"
-          :disabled="!interactive || selected.length === 0 || interacting"
+          :disabled="!canSubmit"
           @click="handleSubmit"
         >
-          Submit ({{ selected.length }} selected)
+          Submit ({{ selectedCount }} selected)
         </Button>
       </div>
     </TooltipProvider>

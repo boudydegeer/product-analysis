@@ -372,6 +372,7 @@ async def stream_claude_response(
                 full_response += chunk
 
             # Parse JSON response
+            response_data = None
             try:
                 response_data = json.loads(full_response)
                 blocks = response_data.get("blocks", [])

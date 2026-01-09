@@ -53,7 +53,7 @@
           </div>
           <div class="space-y-2">
             <template
-              v-for="block in message.content.blocks.filter(b => b.type !== 'interaction_response')"
+              v-for="block in message.content.blocks"
               :key="block.id"
             >
               <component
@@ -81,7 +81,7 @@
           </div>
           <div class="space-y-2">
             <template
-              v-for="block in store.pendingBlocks.filter(b => b.type !== 'interaction_response')"
+              v-for="block in store.pendingBlocks"
               :key="block.id"
             >
               <component
@@ -149,6 +149,7 @@ import type { Block, WSServerMessage, WSUserMessage, WSInteraction, MessageConte
 import TextBlock from '@/components/brainstorm/blocks/TextBlock.vue'
 import ButtonGroupBlock from '@/components/brainstorm/blocks/ButtonGroupBlock.vue'
 import MultiSelectBlock from '@/components/brainstorm/blocks/MultiSelectBlock.vue'
+import InteractionResponseBlock from '@/components/brainstorm/blocks/InteractionResponseBlock.vue'
 
 const props = defineProps<{
   sessionId: string
@@ -189,6 +190,8 @@ function getBlockComponent(type: string) {
       return ButtonGroupBlock
     case 'multi_select':
       return MultiSelectBlock
+    case 'interaction_response':
+      return InteractionResponseBlock
     default:
       return TextBlock
   }

@@ -102,9 +102,12 @@ async def test_handles_malformed_json_gracefully():
     mock_service_instance.__aenter__ = AsyncMock(return_value=mock_service_instance)
     mock_service_instance.__aexit__ = AsyncMock(return_value=None)
 
+    # Create mock agent factory
+    mock_agent_factory = MagicMock()
+
     with patch('app.api.brainstorms.BrainstormingService', return_value=mock_service_instance):
         # Call the function directly
-        await stream_claude_response(mock_websocket, mock_db, "test-session")
+        await stream_claude_response(mock_websocket, mock_db, "test-session", mock_agent_factory)
 
     # Verify fallback text block was sent
     assert len(sent_messages) >= 1

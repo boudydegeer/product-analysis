@@ -92,8 +92,13 @@
                 @skip="handleSkip"
               />
             </template>
-            <div v-if="store.pendingBlocks.length === 0" class="text-sm text-muted-foreground">
-              Claude is thinking...
+            <div v-if="store.pendingBlocks.length === 0" class="flex items-center gap-2 text-sm text-muted-foreground">
+              <div class="flex gap-1">
+                <div class="w-2 h-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]"></div>
+                <div class="w-2 h-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.15s]"></div>
+                <div class="w-2 h-2 rounded-full bg-muted-foreground/60 animate-bounce"></div>
+              </div>
+              <span>Thinking...</span>
             </div>
           </div>
         </div>

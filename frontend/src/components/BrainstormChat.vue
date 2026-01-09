@@ -203,7 +203,7 @@ function connectWebSocket() {
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const host = import.meta.env.VITE_API_URL?.replace(/^https?:\/\//, '') || 'localhost:8891'
-  const wsUrl = `${protocol}//${host}/api/brainstorms/${currentSession.value.id}/ws`
+  const wsUrl = `${protocol}//${host}/api/v1/brainstorms/ws/${currentSession.value.id}`
 
   console.log('[WS] Connecting to:', wsUrl)
 

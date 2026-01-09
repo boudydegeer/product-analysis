@@ -409,6 +409,10 @@ async def stream_claude_response(
 
                 # Send blocks incrementally
                 for block in blocks:
+                    # Ensure block has an id
+                    if "id" not in block:
+                        block["id"] = str(uuid4())
+
                     await websocket.send_json({
                         "type": "stream_chunk",
                         "message_id": message_id,

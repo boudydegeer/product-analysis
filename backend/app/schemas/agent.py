@@ -71,8 +71,6 @@ class AgentUpdate(BaseModel):
 class AgentResponse(AgentBase):
     """Schema for Agent response with all fields."""
 
-    model_config = ConfigDict(from_attributes=True, json_encoders={datetime: lambda v: v.isoformat()})
-
     id: int
     avatar_url: Optional[str] = None
     avatar_color: str
@@ -87,6 +85,8 @@ class AgentResponse(AgentBase):
     version: str
     created_at: datetime
     updated_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class ToolAssignmentConfig(BaseModel):

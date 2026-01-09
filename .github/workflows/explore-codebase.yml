@@ -1,0 +1,161 @@
+name: Explore Codebase
+
+on:
+  workflow_dispatch:
+    inputs:
+      exploration_id:
+        description: 'Unique identifier for this exploration'
+        required: true
+        type: string
+      query:
+        description: 'What to explore in the codebase'
+        required: true
+        type: string
+      scope:
+        description: 'Scope of exploration: full, backend, or frontend'
+        required: false
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - backend
+          - frontend
+      focus:
+        description: 'Focus area: patterns, files, architecture, dependencies'
+        required: false
+        default: 'patterns'
+        type: choice
+        options:
+          - patterns
+          - files
+          - architecture
+          - dependencies
+      callback_url:
+        description: 'Optional URL to POST results to'
+        required: false
+        type: string
+
+jobs:
+  explore-codebase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better context
+
+      - name: Remove ignored files and directories
+        run: |
+          echo "Removing directories that should be ignored from exploration..."
+
+          # Python artifacts
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
+          rm -rf backend/.venv 2>/dev/null || true
+          rm -rf backend/build 2>/dev/null || true
+          rm -rf backend/dist 2>/dev/null || true
+
+          # Node.js artifacts
+          rm -rf node_modules 2>/dev/null || true
+          rm -rf frontend/node_modules 2>/dev/null || true
+          rm -rf frontend/dist 2>/dev/null || true
+
+          # IDE and system files
+          rm -rf .idea 2>/dev/null || true
+          find . -name ".DS_Store" -delete 2>/dev/null || true
+
+          # Git directory (not needed for exploration)
+          rm -rf .git 2>/dev/null || true
+
+          echo "Cleanup complete. Remaining structure:"
+          du -sh * 2>/dev/null | head -20
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate inputs
+        id: validate
+        run: |
+          echo "exploration_id=${{ github.event.inputs.exploration_id }}" >> $GITHUB_OUTPUT
+          echo "query=${{ github.event.inputs.query }}" >> $GITHUB_OUTPUT
+          echo "scope=${{ github.event.inputs.scope }}" >> $GITHUB_OUTPUT
+          echo "focus=${{ github.event.inputs.focus }}" >> $GITHUB_OUTPUT
+          echo "callback_url=${{ github.event.inputs.callback_url }}" >> $GITHUB_OUTPUT
+          echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: |
+          pip install anthropic requests
+
+      - name: Run codebase exploration
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          EXPLORATION_ID: ${{ steps.validate.outputs.exploration_id }}
+          QUERY: ${{ steps.validate.outputs.query }}
+          SCOPE: ${{ steps.validate.outputs.scope }}
+          FOCUS: ${{ steps.validate.outputs.focus }}
+          CALLBACK_URL: ${{ steps.validate.outputs.callback_url }}
+          TIMESTAMP: ${{ steps.validate.outputs.timestamp }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: python .github/scripts/explore_codebase.py
+
+      - name: Upload exploration results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exploration-results-${{ github.event.inputs.exploration_id }}
+          path: /tmp/exploration_result.json
+          retention-days: 7
+
+      - name: Post results to callback URL
+        if: ${{ github.event.inputs.callback_url != '' }}
+        run: |
+          if [ -f /tmp/exploration_result.json ]; then
+            echo "Posting results to callback URL: ${{ github.event.inputs.callback_url }}"
+            curl -X POST \
+              -H "Content-Type: application/json" \
+              -H "X-Exploration-ID: ${{ github.event.inputs.exploration_id }}" \
+              -H "X-Workflow-Run-ID: ${{ github.run_id }}" \
+              -d @/tmp/exploration_result.json \
+              --max-time 30 \
+              --retry 3 \
+              --retry-delay 5 \
+              "${{ github.event.inputs.callback_url }}" \
+              && echo "Callback successful" \
+              || echo "Callback failed but continuing workflow"
+          else
+            echo "No results file found to post"
+          fi
+
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "# Codebase Exploration Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Exploration ID:** \`${{ github.event.inputs.exploration_id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Query:** ${{ github.event.inputs.query }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Scope:** ${{ github.event.inputs.scope }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Focus:** ${{ github.event.inputs.focus }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Explored at:** ${{ steps.validate.outputs.timestamp }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow Run:** [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f /tmp/exploration_result.json ]; then
+            echo "## Exploration Summary" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+            cat /tmp/exploration_result.json | head -100 >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Full results available in workflow artifacts." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Status:** Exploration failed or produced no output" >> $GITHUB_STEP_SUMMARY
+          fi

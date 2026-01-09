@@ -115,6 +115,44 @@ analyses
   - created_at, updated_at (timestamptz)
 ```
 
+## Dynamic Tools System
+
+The application supports a flexible, database-driven system for managing Claude Agent SDK tools and personalized agents.
+
+### Agent Types
+
+Each agent type has:
+- **Identity**: name, display_name, description
+- **Personalization**: avatar (emoji/URL), color, personality traits
+- **Configuration**: model, system_prompt, temperature
+- **Tools**: Dynamic assignment of available tools
+
+Current agents:
+- **brainstorm** (Claude the Brainstormer 🎨): Creative facilitator for product discovery
+
+### Tools
+
+Tools are Claude Agent SDK functions that can be called during conversations. They are stored in the database and dynamically loaded per agent type.
+
+Current tools:
+- **create_plan**: Creates implementation plan from feature brief
+- **web_search**: Searches web for information
+
+### Adding New Agents
+
+1. Create agent type in database (via seed script or API)
+2. Assign tools to agent
+3. Agent automatically available in UI
+
+### Adding New Tools
+
+1. Register tool in database with definition
+2. Assign to agent types
+3. Tool automatically available when agent is used
+
+See `docs/design/dynamic-tools-system.md` for full architecture.
+See `docs/guides/dynamic-tools-usage.md` for usage examples.
+
 ## Configuration
 
 ### Backend Environment Variables (`/backend/.env`)

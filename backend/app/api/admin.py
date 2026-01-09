@@ -1,5 +1,6 @@
 """Admin API endpoints for managing agents and tools."""
 import logging
+from datetime import datetime
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -127,8 +128,8 @@ class ToolResponse(BaseModel):
     version: str
     tags: list[str]
     example_usage: str | None
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
     created_by: str | None
 
     class Config:

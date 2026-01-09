@@ -81,8 +81,7 @@ function toggleOption(value: string, checked: boolean | 'indeterminate') {
       >
         <Checkbox
           :model-value="isChecked(option.id)"
-          :disabled="true"
-          @click.stop.prevent
+          class="pointer-events-none"
         />
         <div class="grid gap-1.5 leading-none flex-1">
           <div class="text-sm font-normal">

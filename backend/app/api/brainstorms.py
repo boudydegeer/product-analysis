@@ -428,11 +428,23 @@ async def auto_generate_session_metadata(db, session_id: str, messages: list):
         if msg.role == "user":
             for block in msg.content.get("blocks", []):
                 if block["type"] == "text":
-                    conversation_summary.append(f"User: {block['text']}")
+                    # Defensive: ensure text is a string
+                    text_value = block.get("text", "")
+                    if isinstance(text_value, dict):
+                        text_value = json.dumps(text_value)
+                    elif not isinstance(text_value, str):
+                        text_value = str(text_value)
+                    conversation_summary.append(f"User: {text_value}")
         elif msg.role == "assistant":
             for block in msg.content.get("blocks", []):
                 if block["type"] == "text" and "text" in block:
-                    conversation_summary.append(f"Assistant: {block['text'][:200]}")
+                    # Defensive: ensure text is a string
+                    text_value = block.get("text", "")
+                    if isinstance(text_value, dict):
+                        text_value = json.dumps(text_value)
+                    elif not isinstance(text_value, str):
+                        text_value = str(text_value)
+                    conversation_summary.append(f"Assistant: {text_value[:200]}")
 
     conversation_text = "\n".join(conversation_summary)
 
@@ -490,7 +502,15 @@ async def stream_claude_response(
             text_parts = []
             for block in msg.content.get("blocks", []):
                 if block["type"] == "text":
-                    text_parts.append(block["text"])
+                    # Defensive: ensure text is a string
+                    text_value = block.get("text", "")
+                    if isinstance(text_value, dict):
+                        logger.warning(f"[WS] User message block has dict text: {text_value}")
+                        text_value = json.dumps(text_value)
+                    elif not isinstance(text_value, str):
+                        logger.warning(f"[WS] User message block has non-string text: {type(text_value)}")
+                        text_value = str(text_value)
+                    text_parts.append(text_value)
                 elif block["type"] == "interaction_response":
                     text_parts.append(f"Selected: {block['value']}")
             conversation.append({"role": "user", "content": " ".join(text_parts)})
@@ -499,7 +519,15 @@ async def stream_claude_response(
             text_parts = []
             for b in msg.content.get("blocks", []):
                 if b["type"] == "text" and "text" in b:
-                    text_parts.append(b["text"])
+                    # Defensive: ensure text is a string
+                    text_value = b.get("text", "")
+                    if isinstance(text_value, dict):
+                        logger.warning(f"[WS] Assistant message block has dict text: {text_value}")
+                        text_value = json.dumps(text_value)
+                    elif not isinstance(text_value, str):
+                        logger.warning(f"[WS] Assistant message block has non-string text: {type(text_value)}")
+                        text_value = str(text_value)
+                    text_parts.append(text_value)
             if text_parts:
                 conversation.append({"role": "assistant", "content": " ".join(text_parts)})
 

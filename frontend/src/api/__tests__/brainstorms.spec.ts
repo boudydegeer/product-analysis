@@ -4,25 +4,6 @@ import apiClient from '../client'
 
 vi.mock('../client')
 
-// Mock EventSource as a constructor
-class MockEventSource {
-  url: string
-  readyState: number = 0
-  onopen: any = null
-  onmessage: any = null
-  onerror: any = null
-  close = vi.fn()
-  addEventListener = vi.fn()
-  removeEventListener = vi.fn()
-  dispatchEvent = vi.fn()
-
-  constructor(url: string) {
-    this.url = url
-  }
-}
-
-;(globalThis as any).EventSource = MockEventSource
-
 describe('Brainstorms API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -91,12 +72,5 @@ describe('Brainstorms API', () => {
 
     expect(result).toEqual(mockSession)
     expect(apiClient.get).toHaveBeenCalledWith('/brainstorms/session-1')
-  })
-
-  it('should create EventSource for streaming', () => {
-    const mockEventSource = brainstormsApi.streamBrainstorm('session-1', 'Hello')
-
-    expect(mockEventSource).toBeDefined()
-    expect(mockEventSource.url).toContain('/brainstorms/session-1/stream?message=Hello')
   })
 })

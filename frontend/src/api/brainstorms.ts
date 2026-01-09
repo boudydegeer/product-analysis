@@ -47,15 +47,6 @@ export const brainstormsApi = {
   async deleteSession(id: string): Promise<void> {
     await apiClient.delete(`/brainstorms/${id}`)
   },
-
-  /**
-   * Create EventSource for streaming brainstorm
-   */
-  streamBrainstorm(sessionId: string, message: string): EventSource {
-    const baseUrl = apiClient.defaults.baseURL || 'http://localhost:8891/api/v1'
-    const url = `${baseUrl}/brainstorms/${sessionId}/stream?message=${encodeURIComponent(message)}`
-    return new EventSource(url)
-  },
 }
 
 export default brainstormsApi

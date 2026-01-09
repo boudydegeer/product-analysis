@@ -88,7 +88,7 @@
                 <Button
                   size="sm"
                   variant="ghost"
-                  @click.stop="$emit('toggle-enabled', tool.id)"
+                  @click.stop="$emit('toggleEnabled', tool.id)"
                   :title="tool.enabled ? 'Disable' : 'Enable'"
                 >
                   <Power class="h-4 w-4" :class="tool.enabled ? 'text-green-500' : ''" />
@@ -128,7 +128,7 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-} from '@/components/ui/card.ts'
+} from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import type { ToolResponse } from '@/api/admin'
 

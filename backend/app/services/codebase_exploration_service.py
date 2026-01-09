@@ -212,7 +212,7 @@ class CodebaseExplorationService:
 
                 examples_content.append(example_text)
 
-            sections.append(f"### Code Examples\n\n" + "\n\n---\n\n".join(examples_content))
+            sections.append("### Code Examples\n\n" + "\n\n---\n\n".join(examples_content))
 
         # Recommendations
         recommendations = results.get("recommendations", [])

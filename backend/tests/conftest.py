@@ -13,6 +13,7 @@ from app.models.idea import Idea  # noqa: F401
 from app.models.brainstorm import BrainstormSession, BrainstormMessage  # noqa: F401
 from app.models.tool import Tool  # noqa: F401
 from app.models.agent import AgentType, AgentToolConfig, ToolUsageAudit  # noqa: F401
+from app.models.codebase_exploration import CodebaseExploration  # noqa: F401
 
 
 # Test database URL

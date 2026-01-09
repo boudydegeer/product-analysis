@@ -1,4 +1,4 @@
-"""Background task for polling analysis workflows."""
+"""Background task for polling analysis workflows and codebase explorations."""
 
 import logging
 from contextlib import asynccontextmanager
@@ -34,6 +34,29 @@ async def poll_analyzing_features() -> None:
         logger.error(f"Polling task: Failed with error - {e}", exc_info=True)
 
 
+async def poll_pending_explorations() -> None:
+    """Background task to poll codebase explorations in INVESTIGATING status.
+
+    This runs periodically to check workflow status and download results
+    for explorations that are waiting for GitHub Actions to complete.
+    """
+    logger.info("Exploration polling task: Started")
+
+    try:
+        async with async_session_maker() as db:
+            polling_service = AnalysisPollingService(db)
+            polled_count = await polling_service.poll_all_investigating_explorations()
+
+            logger.info(
+                f"Exploration polling task: Completed, processed {polled_count} explorations"
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Exploration polling task: Failed with error - {e}", exc_info=True
+        )
+
+
 def start_polling_scheduler() -> AsyncIOScheduler:
     """Start the background polling scheduler.
 
@@ -48,13 +71,23 @@ def start_polling_scheduler() -> AsyncIOScheduler:
 
     scheduler = AsyncIOScheduler()
 
-    # Add job to poll every N seconds
+    # Add job to poll features every N seconds
     scheduler.add_job(
         poll_analyzing_features,
         trigger="interval",
         seconds=settings.analysis_polling_interval_seconds,
         id="poll_analyzing_features",
         name="Poll analyzing features for workflow results",
+        replace_existing=True,
+    )
+
+    # Add job to poll explorations every N seconds (same interval)
+    scheduler.add_job(
+        poll_pending_explorations,
+        trigger="interval",
+        seconds=settings.analysis_polling_interval_seconds,
+        id="poll_pending_explorations",
+        name="Poll pending codebase explorations for workflow results",
         replace_existing=True,
     )
 

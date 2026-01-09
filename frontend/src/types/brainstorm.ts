@@ -96,7 +96,32 @@ export interface WSError {
   message: string
 }
 
-export type WSServerMessage = WSStreamChunk | WSStreamComplete | WSError
+// Tool execution tracking
+export interface ToolExecution {
+  tool_name: string
+  exploration_id?: string
+  status: 'pending' | 'executing' | 'completed' | 'failed'
+  message?: string
+  started_at: string
+  completed_at?: string
+}
+
+// WebSocket message for tool execution
+export interface WSToolExecuting {
+  type: 'tool_executing'
+  tool_name: string
+  exploration_id?: string
+  status: string
+  message?: string
+}
+
+// WebSocket message for user message saved confirmation
+export interface WSUserMessageSaved {
+  type: 'user_message_saved'
+  message: Message
+}
+
+export type WSServerMessage = WSStreamChunk | WSStreamComplete | WSError | WSToolExecuting | WSUserMessageSaved
 export type WSClientMessage = WSUserMessage | WSInteraction
 
 // Session types

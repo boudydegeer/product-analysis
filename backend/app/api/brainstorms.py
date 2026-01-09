@@ -14,6 +14,7 @@ from app.models.brainstorm import (
     BrainstormSessionStatus,
     BrainstormMessage,
 )
+from app.models.codebase_exploration import CodebaseExploration, CodebaseExplorationStatus
 from app.schemas.brainstorm import (
     BrainstormSessionCreate,
     BrainstormSessionUpdate,
@@ -22,6 +23,7 @@ from app.schemas.brainstorm import (
 from app.services.brainstorming_service import BrainstormingService
 from app.services.agent_factory import AgentFactory
 from app.services.tools_service import ToolsService
+from app.services.codebase_exploration_service import CodebaseExplorationService
 
 logger = logging.getLogger(__name__)
 logger.warning("*" * 60)
@@ -56,6 +58,122 @@ def extract_json_from_markdown(text: str) -> str:
 
     # Return as-is if no code blocks found
     return text
+
+
+async def handle_tool_call(
+    tool_name: str,
+    tool_input: dict,
+    session_id: str,
+    message_id: str,
+    db: AsyncSession,
+    websocket: WebSocket
+) -> dict:
+    """Dispatch tool calls to appropriate handlers.
+
+    Args:
+        tool_name: Name of the tool being called.
+        tool_input: Input parameters for the tool.
+        session_id: ID of the brainstorming session.
+        message_id: ID of the message that triggered the tool call.
+        db: Database session.
+        websocket: WebSocket connection for sending status updates.
+
+    Returns:
+        Dict containing tool execution result.
+    """
+    if tool_name == "explore_codebase":
+        return await handle_explore_codebase(
+            tool_input, session_id, message_id, db, websocket
+        )
+    # Add more tool handlers here as needed
+    return {"error": f"Unknown tool: {tool_name}"}
+
+
+async def handle_explore_codebase(
+    tool_input: dict,
+    session_id: str,
+    message_id: str,
+    db: AsyncSession,
+    websocket: WebSocket
+) -> dict:
+    """Handle explore_codebase tool call.
+
+    Creates an exploration record, triggers the GitHub workflow, and sends
+    status updates via WebSocket.
+
+    Args:
+        tool_input: Input parameters containing query, scope, and focus.
+        session_id: ID of the brainstorming session.
+        message_id: ID of the message that triggered the exploration.
+        db: Database session.
+        websocket: WebSocket connection for sending status updates.
+
+    Returns:
+        Dict containing exploration_id, status, and message.
+    """
+    exploration_service = CodebaseExplorationService()
+
+    # Generate exploration ID
+    exploration_id = exploration_service.generate_exploration_id()
+
+    # Create exploration record
+    exploration = CodebaseExploration(
+        id=exploration_id,
+        session_id=session_id,
+        message_id=message_id,
+        query=tool_input.get("query", ""),
+        scope=tool_input.get("scope", "full"),
+        focus=tool_input.get("focus", "patterns"),
+        status=CodebaseExplorationStatus.PENDING
+    )
+    db.add(exploration)
+    await db.commit()
+
+    # Trigger GitHub workflow
+    try:
+        result = await exploration_service.trigger_exploration(
+            db=db,
+            exploration_id=exploration_id,
+            query=tool_input.get("query", ""),
+            scope=tool_input.get("scope", "full"),
+            focus=tool_input.get("focus", "patterns"),
+            session_id=session_id,
+            message_id=message_id
+        )
+
+        # Update exploration with workflow info
+        exploration.workflow_run_id = result.get("workflow_run_id")
+        exploration.workflow_url = result.get("workflow_url")
+        exploration.status = CodebaseExplorationStatus.INVESTIGATING
+        await db.commit()
+
+        # Send WebSocket message to frontend
+        await websocket.send_json({
+            "type": "tool_executing",
+            "tool_name": "explore_codebase",
+            "exploration_id": exploration_id,
+            "status": "investigating",
+            "message": "Investigating codebase..."
+        })
+
+        logger.info(
+            f"[TOOL] Started codebase exploration: {exploration_id}, "
+            f"workflow_run_id={result.get('workflow_run_id')}"
+        )
+
+        return {
+            "exploration_id": exploration_id,
+            "status": "investigating",
+            "message": "Codebase exploration started. Results will be available shortly."
+        }
+    except Exception as e:
+        exploration.status = CodebaseExplorationStatus.FAILED
+        exploration.error_message = str(e)
+        await db.commit()
+
+        logger.error(f"[TOOL] Codebase exploration failed: {exploration_id}, error={e}")
+
+        return {"error": str(e)}
 
 
 @router.get("/debug/version")

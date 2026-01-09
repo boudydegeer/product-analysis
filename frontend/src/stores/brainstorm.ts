@@ -8,6 +8,7 @@ import type {
   BrainstormSessionUpdate,
   Message,
   Block,
+  ToolExecution,
 } from '@/types/brainstorm'
 import type { AgentType } from '@/types/agent'
 
@@ -27,6 +28,7 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
   const streamingMessageId = ref<string | null>(null)
   const pendingBlocks = ref<Block[]>([])
   const interactiveElementsActive = ref(false)
+  const activeToolExecution = ref<ToolExecution | null>(null)
 
   // Getters
   const isActive = computed(
@@ -231,6 +233,27 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
     }
   }
 
+  // Tool execution actions
+  function setToolExecuting(execution: ToolExecution) {
+    activeToolExecution.value = execution
+  }
+
+  function clearToolExecution() {
+    activeToolExecution.value = null
+  }
+
+  function updateToolExecutionStatus(status: string, message?: string) {
+    if (activeToolExecution.value) {
+      activeToolExecution.value.status = status as ToolExecution['status']
+      if (message) {
+        activeToolExecution.value.message = message
+      }
+      if (status === 'completed' || status === 'failed') {
+        activeToolExecution.value.completed_at = new Date().toISOString()
+      }
+    }
+  }
+
   return {
     // State
     currentSession,
@@ -243,6 +266,7 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
     streamingMessageId,
     pendingBlocks,
     interactiveElementsActive,
+    activeToolExecution,
     // Getters
     isActive,
     // Actions
@@ -259,5 +283,8 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
     setWsConnected,
     clearError,
     fetchAgentConfig,
+    setToolExecuting,
+    clearToolExecution,
+    updateToolExecutionStatus,
   }
 })

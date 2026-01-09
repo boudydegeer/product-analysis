@@ -93,6 +93,22 @@ npm run test:run                       # Run tests once
   - Estimates story points, hours, and identifies prerequisites
   - Returns structured JSON with tasks, risks, recommendations
 
+### Codebase Exploration Tool
+
+The `explore_codebase` tool allows brainstorm agents to explore the codebase for technical context. It works via GitHub Actions:
+
+1. **Agent invokes tool** with query, scope (full/backend/frontend), focus (patterns/files/architecture/dependencies)
+2. **Backend triggers workflow** via `CodebaseExplorationService`
+3. **GitHub Action runs** Claude Agent SDK to explore the repository
+4. **Results returned** via polling (or webhook in production)
+5. **Context injected** back into agent conversation
+
+**Database table:** `codebase_explorations` tracks exploration status and results
+
+**Polling:** Every 30 seconds via APScheduler (same as feature analysis)
+
+**Frontend:** Shows "Investigating codebase..." status via `ToolExecutionStatus` component
+
 ### Database Schema
 
 ```

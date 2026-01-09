@@ -92,7 +92,7 @@
           <p class="text-xs text-muted-foreground mt-1">
             Enter tags separated by commas
           </p>
-          <div v-if="formData.tags.length > 0" class="flex flex-wrap gap-1 mt-2">
+          <div v-if="(formData.tags || []).length > 0" class="flex flex-wrap gap-1 mt-2">
             <Badge
               v-for="(tag, index) in formData.tags"
               :key="index"
@@ -306,8 +306,10 @@ watch(
 )
 
 function removeTag(index: number) {
-  formData.value.tags.splice(index, 1)
-  tagsInput.value = formData.value.tags.join(', ')
+  if (formData.value.tags) {
+    formData.value.tags.splice(index, 1)
+    tagsInput.value = formData.value.tags.join(', ')
+  }
 }
 
 function handleSubmit() {

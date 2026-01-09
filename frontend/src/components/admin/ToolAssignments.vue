@@ -160,7 +160,7 @@
 import { ref, computed } from 'vue'
 import { Settings, Wrench, Plus, Trash2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card.ts'
+import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -208,9 +208,10 @@ const availableTools = computed(() => {
   return props.tools.filter((tool) => !assignedToolIds.value.has(tool.id))
 })
 
-function handleAgentChange(agentId: string) {
+function handleAgentChange(value: unknown) {
   assignedToolIds.value.clear()
-  if (agentId) {
+  if (value != null) {
+    const agentId = String(value)
     emit('loadAssignments', Number(agentId))
   }
 }

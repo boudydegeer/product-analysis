@@ -93,7 +93,7 @@
               <Button
                 size="sm"
                 variant="ghost"
-                @click.stop="$emit('toggle-enabled', agent.id)"
+                @click.stop="$emit('toggleEnabled', agent.id)"
                 :title="agent.enabled ? 'Disable' : 'Enable'"
               >
                 <Power class="h-4 w-4" :class="agent.enabled ? 'text-green-500' : ''" />
@@ -131,7 +131,7 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-} from '@/components/ui/card.ts'
+} from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import type { AgentTypeResponse } from '@/api/admin'
 

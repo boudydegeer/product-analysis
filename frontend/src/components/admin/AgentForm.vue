@@ -106,7 +106,7 @@
           <p class="text-xs text-muted-foreground mt-1">
             Enter traits separated by commas
           </p>
-          <div v-if="formData.personality_traits.length > 0" class="flex flex-wrap gap-1 mt-2">
+          <div v-if="(formData.personality_traits || []).length > 0" class="flex flex-wrap gap-1 mt-2">
             <Badge
               v-for="(trait, index) in formData.personality_traits"
               :key="index"
@@ -324,8 +324,10 @@ watch(personalityTraitsInput, (value) => {
 })
 
 function removeTrait(index: number) {
-  formData.value.personality_traits.splice(index, 1)
-  personalityTraitsInput.value = formData.value.personality_traits.join(', ')
+  if (formData.value.personality_traits) {
+    formData.value.personality_traits.splice(index, 1)
+    personalityTraitsInput.value = formData.value.personality_traits.join(', ')
+  }
 }
 
 function handleSubmit() {

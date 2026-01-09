@@ -191,4 +191,9 @@ function getStatusClass(status: FeatureStatus): string {
   }
   return classes[status] || 'bg-gray-100 text-gray-800'
 }
+
+// Expose refs for testing
+defineExpose({
+  showCreateForm,
+})
 </script>

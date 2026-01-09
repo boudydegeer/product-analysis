@@ -125,7 +125,12 @@
                 @skip="handleSkip"
               />
             </template>
-            <div v-if="store.pendingBlocks.length === 0" class="flex items-center gap-2 text-sm text-muted-foreground">
+            <!-- Tool Execution Status -->
+            <ToolExecutionStatus
+              v-if="activeToolExecution"
+              :execution="activeToolExecution"
+            />
+            <div v-if="store.pendingBlocks.length === 0 && !activeToolExecution" class="flex items-center gap-2 text-sm text-muted-foreground">
               <div class="flex gap-1">
                 <div class="w-2 h-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]"></div>
                 <div class="w-2 h-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.15s]"></div>
@@ -183,11 +188,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Send, ArrowLeft, Bot, User } from 'lucide-vue-next'
-import type { Block, WSServerMessage, WSUserMessage, WSInteraction, MessageContent } from '@/types/brainstorm'
+import type { Block, WSServerMessage, WSUserMessage, WSInteraction, MessageContent, WSUserMessageSaved } from '@/types/brainstorm'
 import TextBlock from '@/components/brainstorm/blocks/TextBlock.vue'
 import ButtonGroupBlock from '@/components/brainstorm/blocks/ButtonGroupBlock.vue'
 import MultiSelectBlock from '@/components/brainstorm/blocks/MultiSelectBlock.vue'
 import InteractionResponseBlock from '@/components/brainstorm/blocks/InteractionResponseBlock.vue'
+import ToolExecutionStatus from '@/components/brainstorm/ToolExecutionStatus.vue'
 
 const props = defineProps<{
   sessionId: string
@@ -206,6 +212,7 @@ const loading = computed(() => store.loading)
 const isActive = computed(() => store.isActive)
 const interactiveElementsActive = computed(() => store.interactiveElementsActive)
 const currentAgentConfig = computed(() => store.currentAgentConfig)
+const activeToolExecution = computed(() => store.activeToolExecution)
 
 function getStatusVariant(status: string) {
   switch (status) {
@@ -289,9 +296,9 @@ function connectWebSocket() {
 function handleServerMessage(data: WSServerMessage) {
   switch (data.type) {
     case 'user_message_saved':
-      console.log('[WS] User message saved:', (data as any).message)
+      console.log('[WS] User message saved:', (data as WSUserMessageSaved).message)
       // Add the saved user message to the store
-      store.addMessage((data as any).message)
+      store.addMessage((data as WSUserMessageSaved).message)
       scrollToBottom()
       break
 
@@ -322,6 +329,24 @@ function handleServerMessage(data: WSServerMessage) {
       console.error('[WS] Server error:', data.message)
       waitingForResponse.value = false
       store.clearInteractiveState()
+      store.clearToolExecution()
+      break
+
+    case 'tool_executing':
+      console.log('[WS] Tool executing:', data)
+      store.setToolExecuting({
+        tool_name: (data as any).tool_name,
+        exploration_id: (data as any).exploration_id,
+        status: (data as any).status as 'pending' | 'executing' | 'completed' | 'failed',
+        message: (data as any).message,
+        started_at: new Date().toISOString()
+      })
+      // Clear tool execution when completed or failed
+      if ((data as any).status === 'completed' || (data as any).status === 'failed') {
+        setTimeout(() => {
+          store.clearToolExecution()
+        }, 2000) // Show completion status briefly before clearing
+      }
       break
 
     default:
@@ -384,10 +409,15 @@ function handleSkip() {
 
   // Focus on input after clearing interactive state
   nextTick(() => {
-    // Access the underlying textarea element
-    const textarea = messageInput.value?.$el as HTMLTextAreaElement
-    if (textarea) {
-      textarea.focus()
+    // Access the underlying textarea element - the ref is the component instance
+    // which may expose $el or be the element directly
+    const textareaRef = messageInput.value
+    if (textareaRef) {
+      // Try to get the native element - could be wrapped component or direct element
+      const el = (textareaRef as any).$el || textareaRef
+      if (el && typeof el.focus === 'function') {
+        el.focus()
+      }
     }
   })
 }

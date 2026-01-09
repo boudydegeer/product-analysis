@@ -277,9 +277,21 @@ async def websocket_brainstorm(
                     await handle_user_message(websocket, db, session_id, data["content"])
 
                 elif data["type"] == "interaction":
+                    logger.info(f"[WS] Interaction data received: {data}")
+                    block_id = data.get("block_id")
+                    value = data.get("value")
+
+                    if not block_id:
+                        logger.error(f"[WS] Missing block_id in interaction: {data}")
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": "Missing block_id in interaction"
+                        })
+                        continue
+
                     await handle_interaction(
                         websocket, db, session_id,
-                        data["block_id"], data["value"]
+                        block_id, value
                     )
 
         except WebSocketDisconnect:
@@ -412,6 +424,8 @@ async def stream_claude_response(
                     # Ensure block has an id
                     if "id" not in block:
                         block["id"] = str(uuid4())
+
+                    logger.info(f"[WS] Sending block: type={block.get('type')}, id={block.get('id')}")
 
                     await websocket.send_json({
                         "type": "stream_chunk",

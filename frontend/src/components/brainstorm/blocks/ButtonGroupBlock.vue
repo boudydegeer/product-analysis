@@ -13,6 +13,11 @@ const emit = defineEmits<{
 
 function handleClick(value: string) {
   if (props.interactive) {
+    console.log('[ButtonGroupBlock] Clicked:', {
+      blockId: props.block.id,
+      value,
+      fullBlock: props.block
+    })
     emit('interact', props.block.id, value)
   }
 }

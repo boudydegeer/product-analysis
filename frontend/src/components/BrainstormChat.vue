@@ -346,7 +346,11 @@ function handleSkip() {
 
   // Focus on input after clearing interactive state
   nextTick(() => {
-    messageInput.value?.focus()
+    // Access the underlying textarea element
+    const textarea = messageInput.value?.$el as HTMLTextAreaElement
+    if (textarea) {
+      textarea.focus()
+    }
   })
 }
 

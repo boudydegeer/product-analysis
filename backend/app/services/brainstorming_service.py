@@ -262,36 +262,53 @@ I can help you explore this feature. What would you like to focus on?
 
 You have access to WebSearch and WebFetch tools for research."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-5") -> None:
+    def __init__(
+        self,
+        api_key: str,
+        agent_factory: "AgentFactory" = None,
+        agent_name: str = "brainstorm",
+        model: str = "claude-sonnet-4-5"
+    ) -> None:
         """Initialize the brainstorming service.
 
         Args:
             api_key: Anthropic API key
-            model: Claude model to use
+            agent_factory: Optional AgentFactory for dynamic tool loading
+            agent_name: Agent type name to use (default: "brainstorm")
+            model: Claude model to use (fallback if no agent_factory)
         """
         logger.warning("[SERVICE] __init__ called")
         self.api_key = api_key
+        self.agent_factory = agent_factory
+        self.agent_name = agent_name
         self.model = model
+        self.client = None
+        self.connected = False
 
         # Set API key in environment for Claude SDK
         os.environ['ANTHROPIC_API_KEY'] = api_key
         logger.warning("[SERVICE] API key set in environment")
 
-        # Initialize client with options
-        options = ClaudeAgentOptions(
-            model=model,
-            system_prompt=self.SYSTEM_PROMPT,
-        )
-        logger.warning(f"[SERVICE] Creating ClaudeSDKClient with model: {model}")
-        self.client = ClaudeSDKClient(options=options)
-        self.connected = False
-        logger.warning("[SERVICE] ClaudeSDKClient initialized")
-
     async def _ensure_connected(self):
         """Ensure client is connected."""
         logger.warning("[SERVICE] _ensure_connected called")
         if not self.connected:
-            logger.warning("[SERVICE] Not connected, calling client.connect()...")
+            logger.warning("[SERVICE] Not connected, initializing client...")
+
+            if self.agent_factory:
+                # Use agent factory to create client with dynamic tools
+                logger.warning(f"[SERVICE] Creating client via AgentFactory for agent '{self.agent_name}'")
+                self.client = await self.agent_factory.create_agent_client(self.agent_name)
+            else:
+                # Fallback: Create client with static config (backwards compatibility)
+                logger.warning(f"[SERVICE] Creating client with static config (no AgentFactory)")
+                options = ClaudeAgentOptions(
+                    model=self.model,
+                    system_prompt=self.SYSTEM_PROMPT,
+                )
+                self.client = ClaudeSDKClient(options=options)
+
+            logger.warning("[SERVICE] Calling client.connect()...")
             await self.client.connect()
             logger.warning("[SERVICE] client.connect() completed")
             self.connected = True

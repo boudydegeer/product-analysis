@@ -8,7 +8,14 @@ const props = defineProps<{
 }>()
 
 const displayValue = computed(() => {
+  if (!props.block.value) {
+    return 'No selection'
+  }
+
   if (Array.isArray(props.block.value)) {
+    if (props.block.value.length === 0) {
+      return 'No selection'
+    }
     // Format list nicely
     const items = props.block.value.map(v =>
       // Convert kebab-case to Title Case

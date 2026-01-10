@@ -694,6 +694,10 @@ async def stream_claude_response(
             # Use the new stream_with_tool_detection for tool handling
             full_response = ""
 
+            # Guard: Track if we've already triggered a tool for this response
+            # to prevent duplicate workflow triggers
+            tool_already_triggered = False
+
             async for chunk in service.stream_with_tool_detection(conversation):
                 if chunk.type == "text" and chunk.content:
                     full_response += chunk.content
@@ -705,7 +709,16 @@ async def stream_claude_response(
                         f"id={tool_req.tool_id}, input={tool_req.tool_input}"
                     )
 
+                    # Guard: Skip if we've already triggered a tool for this response
+                    if tool_already_triggered:
+                        logger.warning(
+                            f"[WS] Skipping duplicate tool trigger for {tool_req.tool_name} "
+                            f"(already triggered for this response)"
+                        )
+                        continue
+
                     if tool_req.tool_name == "explore_codebase":
+                        tool_already_triggered = True
 
                         # Notify frontend about tool execution
                         await websocket.send_json({

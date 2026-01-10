@@ -583,7 +583,7 @@ You have access to WebSearch and WebFetch tools for research."""
                                 if tool_call:
                                     tool_detected = True
                                     logger.warning(
-                                        f"[BRAINSTORM] Tool call detected: {tool_call}"
+                                        f"[BRAINSTORM] Tool call detected (first and only): {tool_call}"
                                     )
 
                                     # Yield tool use request

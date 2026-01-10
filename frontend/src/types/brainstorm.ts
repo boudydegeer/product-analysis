@@ -121,8 +121,30 @@ export interface WSUserMessageSaved {
   message: Message
 }
 
-export type WSServerMessage = WSStreamChunk | WSStreamComplete | WSError | WSToolExecuting | WSUserMessageSaved
-export type WSClientMessage = WSUserMessage | WSInteraction
+// WebSocket message for exploration completion (from polling service)
+export interface WSExplorationComplete {
+  type: 'exploration_complete'
+  exploration_id: string
+  session_id: string
+  results: string
+}
+
+// WebSocket message for exploration failure (from polling service)
+export interface WSExplorationFailed {
+  type: 'exploration_failed'
+  exploration_id: string
+  session_id: string
+  error: string
+}
+
+// WebSocket message to send exploration results for synthesis
+export interface WSExplorationResults {
+  type: 'exploration_results'
+  content: string
+}
+
+export type WSServerMessage = WSStreamChunk | WSStreamComplete | WSError | WSToolExecuting | WSUserMessageSaved | WSExplorationComplete | WSExplorationFailed
+export type WSClientMessage = WSUserMessage | WSInteraction | WSExplorationResults
 
 // Session types
 export type BrainstormSessionStatus = 'active' | 'paused' | 'completed' | 'archived'

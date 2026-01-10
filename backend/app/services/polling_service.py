@@ -19,6 +19,19 @@ from app.services.github_service import GitHubService, GitHubServiceError
 from app.services.codebase_exploration_service import CodebaseExplorationService
 from app.utils.analysis_mapper import extract_flattened_fields
 
+# Import broadcast function for WebSocket notifications
+# This is imported late to avoid circular imports
+_broadcast_to_session = None
+
+
+async def get_broadcast_function():
+    """Lazily import the broadcast function to avoid circular imports."""
+    global _broadcast_to_session
+    if _broadcast_to_session is None:
+        from app.api.brainstorms import broadcast_to_session
+        _broadcast_to_session = broadcast_to_session
+    return _broadcast_to_session
+
 logger = logging.getLogger(__name__)
 
 
@@ -382,6 +395,32 @@ class AnalysisPollingService:
                 logger.info(
                     f"Polling exploration {exploration.id}: successfully processed"
                 )
+
+                # Broadcast exploration_complete to WebSocket if session is active
+                if exploration.session_id:
+                    try:
+                        broadcast = await get_broadcast_function()
+                        sent = await broadcast(exploration.session_id, {
+                            "type": "exploration_complete",
+                            "exploration_id": exploration.id,
+                            "session_id": exploration.session_id,
+                            "results": exploration.formatted_context
+                        })
+                        if sent:
+                            logger.info(
+                                f"Polling exploration {exploration.id}: "
+                                f"broadcast exploration_complete to session {exploration.session_id}"
+                            )
+                        else:
+                            logger.warning(
+                                f"Polling exploration {exploration.id}: "
+                                f"session {exploration.session_id} not connected, skipping broadcast"
+                            )
+                    except Exception as e:
+                        logger.error(
+                            f"Polling exploration {exploration.id}: "
+                            f"failed to broadcast exploration_complete - {e}"
+                        )
             else:
                 exploration.status = CodebaseExplorationStatus.FAILED
                 exploration.error_message = "No results found in workflow artifact"
@@ -390,12 +429,44 @@ class AnalysisPollingService:
                     f"Polling exploration {exploration.id}: no results in artifact"
                 )
 
+                # Broadcast failure to WebSocket
+                if exploration.session_id:
+                    try:
+                        broadcast = await get_broadcast_function()
+                        await broadcast(exploration.session_id, {
+                            "type": "exploration_failed",
+                            "exploration_id": exploration.id,
+                            "session_id": exploration.session_id,
+                            "error": exploration.error_message
+                        })
+                    except Exception as e:
+                        logger.error(
+                            f"Polling exploration {exploration.id}: "
+                            f"failed to broadcast exploration_failed - {e}"
+                        )
+
         except GitHubServiceError as e:
             logger.error(
                 f"Polling exploration {exploration.id}: failed to download artifact - {e}"
             )
             exploration.status = CodebaseExplorationStatus.FAILED
             exploration.error_message = f"Failed to download results: {str(e)}"
+
+            # Broadcast failure to WebSocket
+            if exploration.session_id:
+                try:
+                    broadcast = await get_broadcast_function()
+                    await broadcast(exploration.session_id, {
+                        "type": "exploration_failed",
+                        "exploration_id": exploration.id,
+                        "session_id": exploration.session_id,
+                        "error": exploration.error_message
+                    })
+                except Exception as e2:
+                    logger.error(
+                        f"Polling exploration {exploration.id}: "
+                        f"failed to broadcast exploration_failed - {e2}"
+                    )
 
     async def poll_all_investigating_explorations(self) -> int:
         """Poll status for all explorations needing polling.

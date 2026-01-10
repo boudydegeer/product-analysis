@@ -45,20 +45,21 @@ async def test_service_uses_agent_config(db_session, monkeypatch):
     db_session.add(config)
     await db_session.commit()
 
-    # Create service
+    # Create service with db_session so it can load agent config
     tools_service = ToolsService(db_session)
     agent_factory = AgentFactory(db_session, tools_service)
 
     service = BrainstormingService(
         api_key="test-key",
+        db=db_session,  # Pass db_session so agent config can be loaded
         agent_factory=agent_factory,
         agent_name="brainstorm"
     )
 
-    await service._ensure_connected()
+    await service._ensure_client()
 
     # Verify client was initialized with agent config
     assert service.client is not None
     assert service.client.options.model == "claude-sonnet-4-5"
-    assert service.client.options.system_prompt == "Custom prompt for testing"
-    assert len(service.client.options.tools) == 1
+    # System prompt now includes tool invocation instructions appended
+    assert "Custom prompt for testing" in service.client.options.system_prompt

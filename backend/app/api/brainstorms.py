@@ -25,10 +25,38 @@ from app.services.codebase_exploration_service import CodebaseExplorationService
 
 logger = logging.getLogger(__name__)
 logger.warning("*" * 60)
-logger.warning("🔥 BRAINSTORMS.PY LOADED - VERSION 3.0 WITH FULL LOGGING")
+logger.warning("🔥 BRAINSTORMS.PY LOADED - VERSION 4.0 WITH WS MANAGER")
 logger.warning("*" * 60)
 
 router = APIRouter(prefix="/api/v1/brainstorms", tags=["brainstorms"])
+
+# WebSocket manager for broadcasting messages to active sessions
+# Maps session_id -> WebSocket connection
+active_websockets: dict[str, WebSocket] = {}
+
+
+async def broadcast_to_session(session_id: str, message: dict) -> bool:
+    """Broadcast a message to an active WebSocket session.
+
+    Args:
+        session_id: The brainstorm session ID
+        message: The message dict to send
+
+    Returns:
+        True if message was sent, False if session not connected
+    """
+    if session_id in active_websockets:
+        ws = active_websockets[session_id]
+        try:
+            await ws.send_json(message)
+            logger.info(f"[WS] Broadcast to session {session_id}: {message.get('type')}")
+            return True
+        except Exception as e:
+            logger.error(f"[WS] Failed to broadcast to session {session_id}: {e}")
+            # Remove stale connection
+            del active_websockets[session_id]
+            return False
+    return False
 
 
 def extract_json_from_markdown(text: str) -> str:
@@ -393,6 +421,10 @@ async def websocket_brainstorm(
     await websocket.accept()
     logger.info(f"[WS] Client connected to session {session_id}")
 
+    # Register WebSocket connection for broadcasting
+    active_websockets[session_id] = websocket
+    logger.info(f"[WS] Registered session {session_id} in active_websockets")
+
     # Independent database session
     async with async_session_maker() as db:
         try:
@@ -444,6 +476,13 @@ async def websocket_brainstorm(
                         block_id, value,
                     )
 
+                elif data["type"] == "exploration_results":
+                    # Handle exploration results that need to be synthesized by Claude
+                    logger.info(f"[WS] Exploration results received for synthesis")
+                    await handle_exploration_results(
+                        websocket, db, session_id, data["content"]
+                    )
+
         except WebSocketDisconnect:
             logger.info(f"[WS] Client disconnected from session {session_id}")
         except Exception as e:
@@ -455,6 +494,11 @@ async def websocket_brainstorm(
                 })
             except Exception:
                 pass
+        finally:
+            # Unregister WebSocket on disconnect
+            if session_id in active_websockets:
+                del active_websockets[session_id]
+                logger.info(f"[WS] Unregistered session {session_id} from active_websockets")
 
 
 async def handle_user_message(
@@ -540,6 +584,52 @@ async def handle_interaction(
     })
 
     # Stream Claude response
+    await stream_claude_response(websocket, db, session_id)
+
+
+async def handle_exploration_results(
+    websocket: WebSocket,
+    db,
+    session_id: str,
+    content: str,
+):
+    """Handle exploration results that need to be synthesized by Claude.
+
+    This is called when the polling service completes an exploration and sends
+    the results to the frontend, which then forwards them here for Claude to
+    synthesize into simple, non-technical language for the PM.
+
+    Args:
+        websocket: The WebSocket connection
+        db: Database session
+        session_id: The brainstorm session ID
+        content: The exploration results wrapped with synthesis instructions
+    """
+    logger.info(f"[WS] Handling exploration results for synthesis in session {session_id}")
+
+    # Save the exploration results as a system-like context message
+    # We don't show this to the user directly, but we need it in conversation history
+    context_message = BrainstormMessage(
+        id=str(uuid4()),
+        session_id=session_id,
+        role="user",
+        content={
+            "blocks": [{
+                "id": str(uuid4()),
+                "type": "text",
+                "text": content
+            }]
+        }
+    )
+    db.add(context_message)
+    await db.commit()
+    await db.refresh(context_message)
+    logger.info("[WS] Saved exploration context for synthesis")
+
+    # Note: We intentionally don't send this back as user_message_saved
+    # because it's internal context, not a user-visible message
+
+    # Stream Claude's synthesis response
     await stream_claude_response(websocket, db, session_id)
 
 

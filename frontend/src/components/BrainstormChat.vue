@@ -190,7 +190,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Send, ArrowLeft, Bot, User } from 'lucide-vue-next'
-import type { Block, WSServerMessage, WSUserMessage, WSInteraction, MessageContent, WSUserMessageSaved } from '@/types/brainstorm'
+import type { Block, WSServerMessage, WSUserMessage, WSInteraction, MessageContent, WSUserMessageSaved, WSExplorationComplete, WSExplorationFailed, WSExplorationResults } from '@/types/brainstorm'
 import TextBlock from '@/components/brainstorm/blocks/TextBlock.vue'
 import ButtonGroupBlock from '@/components/brainstorm/blocks/ButtonGroupBlock.vue'
 import MultiSelectBlock from '@/components/brainstorm/blocks/MultiSelectBlock.vue'
@@ -352,6 +352,26 @@ function handleServerMessage(data: WSServerMessage) {
       }
       break
 
+    case 'exploration_complete':
+      console.log('[WS] Exploration complete:', data)
+      // Clear the exploring state
+      store.clearToolExecution()
+      // Send exploration results to Claude for synthesis
+      sendExplorationResults((data as WSExplorationComplete).results)
+      break
+
+    case 'exploration_failed':
+      console.log('[WS] Exploration failed:', data)
+      // Clear the exploring state
+      store.clearToolExecution()
+      // Show error to user
+      store.appendBlock({
+        id: crypto.randomUUID(),
+        type: 'text',
+        text: `I encountered an issue while exploring the codebase: ${(data as WSExplorationFailed).error}. Let me try a different approach or you can rephrase your question.`
+      })
+      break
+
     default:
       console.warn('[WS] Unknown message type:', (data as any).type)
   }
@@ -423,6 +443,44 @@ function handleSkip() {
       }
     }
   })
+}
+
+function sendExplorationResults(results: string) {
+  /**
+   * Send exploration results to Claude for synthesis.
+   *
+   * When the polling service completes an exploration, it sends the results
+   * via WebSocket. This function wraps those results with synthesis instructions
+   * and sends them back to the backend for Claude to process.
+   *
+   * Claude will synthesize the technical findings into simple, non-technical
+   * language that a PM can understand.
+   */
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
+    console.error('[WS] Cannot send exploration results: WebSocket not open')
+    return
+  }
+
+  console.log('[WS] Sending exploration results for synthesis')
+
+  // Wrap the results with synthesis instructions for Claude
+  const contextMessage = `[EXPLORATION_RESULTS]
+${results}
+[/EXPLORATION_RESULTS]
+
+Based on these technical findings, explain to the PM in simple, non-technical terms what you found and what it means for their feature request.`
+
+  // Send to backend for Claude processing
+  const message: WSExplorationResults = {
+    type: 'exploration_results',
+    content: contextMessage
+  }
+
+  ws.value.send(JSON.stringify(message))
+
+  // Set waiting state since Claude will respond
+  waitingForResponse.value = true
+  scrollToBottom()
 }
 
 function cleanup() {

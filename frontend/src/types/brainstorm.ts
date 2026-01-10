@@ -100,7 +100,7 @@ export interface WSError {
 export interface ToolExecution {
   tool_name: string
   exploration_id?: string
-  status: 'pending' | 'executing' | 'completed' | 'failed'
+  status: 'pending' | 'executing' | 'investigating' | 'completed' | 'failed'
   message?: string
   started_at: string
   completed_at?: string

@@ -127,9 +127,9 @@
             </template>
             <!-- Tool Execution Status -->
             <ToolExecutionStatus
-              v-if="activeToolExecution?.status === 'executing'"
+              v-if="activeToolExecution?.status === 'executing' || activeToolExecution?.status === 'investigating'"
             />
-            <div v-if="store.pendingBlocks.length === 0 && activeToolExecution?.status !== 'executing'" class="flex items-center gap-2 text-sm text-muted-foreground">
+            <div v-if="store.pendingBlocks.length === 0 && !isExploring" class="flex items-center gap-2 text-sm text-muted-foreground">
               <div class="flex gap-1">
                 <div class="w-2 h-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]"></div>
                 <div class="w-2 h-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.15s]"></div>
@@ -153,7 +153,7 @@
         <Textarea
           ref="messageInput"
           v-model="userMessage"
-          :placeholder="isExploring ? 'Waiting for exploration results...' : 'Share your thoughts...'"
+          :placeholder="isExploring ? 'Esperando resultados del analisis...' : 'Share your thoughts...'"
           :disabled="store.streamingMessageId !== null || loading || !isActive || interactiveElementsActive || isExploring"
           @keydown.enter.exact.prevent="handleSendMessage"
           :class="['flex-1 resize-none', isExploring ? 'opacity-60' : '']"
@@ -172,7 +172,7 @@
         This session is not active
       </p>
       <p v-else-if="isExploring" class="text-xs text-muted-foreground mt-2">
-        Exploring codebase...
+        Analizando codebase...
       </p>
       <p v-else-if="interactiveElementsActive" class="text-xs text-muted-foreground mt-2">
         Please respond to the interactive element above
@@ -215,7 +215,10 @@ const isActive = computed(() => store.isActive)
 const interactiveElementsActive = computed(() => store.interactiveElementsActive)
 const currentAgentConfig = computed(() => store.currentAgentConfig)
 const activeToolExecution = computed(() => store.activeToolExecution)
-const isExploring = computed(() => activeToolExecution.value?.status === 'executing')
+const isExploring = computed(() => {
+  const status = activeToolExecution.value?.status
+  return status === 'executing' || status === 'investigating'
+})
 
 function getStatusVariant(status: string) {
   switch (status) {

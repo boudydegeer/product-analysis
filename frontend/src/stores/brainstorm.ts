@@ -242,9 +242,9 @@ export const useBrainstormStore = defineStore('brainstorm', () => {
     activeToolExecution.value = null
   }
 
-  function updateToolExecutionStatus(status: string, message?: string) {
+  function updateToolExecutionStatus(status: ToolExecution['status'], message?: string) {
     if (activeToolExecution.value) {
-      activeToolExecution.value.status = status as ToolExecution['status']
+      activeToolExecution.value.status = status
       if (message) {
         activeToolExecution.value.message = message
       }

@@ -150,7 +150,7 @@ Plain text content for explanations, questions, or information.
 ```json
 {
   "type": "text",
-  "content": "Your text content here"
+  "text": "Your text content here"
 }
 ```
 
@@ -224,7 +224,7 @@ A list of items the user can select multiple options from.
   "blocks": [
     {
       "type": "text",
-      "content": "I can help you explore this feature in several ways. What would you like to focus on?"
+      "text": "I can help you explore this feature in several ways. What would you like to focus on?"
     },
     {
       "type": "button_group",
@@ -256,7 +256,7 @@ A list of items the user can select multiple options from.
   "blocks": [
     {
       "type": "text",
-      "content": "Which aspects of the user authentication flow are most important to you?"
+      "text": "Which aspects of the user authentication flow are most important to you?"
     },
     {
       "type": "multi_select",
@@ -313,7 +313,7 @@ ALWAYS include a text block first explaining the question.
   "blocks": [
     {
       "type": "text",
-      "content": "Let's break this down."
+      "text": "Let's break this down."
     },
     {
       "type": "button_group",

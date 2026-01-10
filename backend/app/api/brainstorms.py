@@ -32,13 +32,13 @@ router = APIRouter(prefix="/api/v1/brainstorms", tags=["brainstorms"])
 
 
 def extract_json_from_markdown(text: str) -> str:
-    """Extract JSON from markdown code blocks if present.
+    """Extract JSON from markdown code blocks or raw JSON in text.
 
     Args:
-        text: Text that may contain JSON in markdown code blocks
+        text: Text that may contain JSON in markdown code blocks or as raw JSON
 
     Returns:
-        Extracted JSON string or original text if no code blocks found
+        Extracted JSON string or original text if no JSON found
     """
     # Try to find JSON in ```json ... ``` blocks
     json_block_pattern = r'```(?:json)?\s*(\{[\s\S]*?\})\s*```'
@@ -54,8 +54,39 @@ def extract_json_from_markdown(text: str) -> str:
     if match:
         return match.group(1)
 
-    # Return as-is if no code blocks found
+    # Try to find raw JSON object with "blocks" array (not in code blocks)
+    # This handles cases where Claude outputs text before the JSON
+    # Pattern: find { then "blocks" with any content until the final closing }
+    raw_json_pattern = r'(\{[^{}]*"blocks"[^{}]*\:[\s\S]*\][\s\S]*\})'
+    match = re.search(raw_json_pattern, text, re.MULTILINE | re.DOTALL)
+
+    if match:
+        return match.group(1)
+
+    # Return as-is if no JSON found
     return text
+
+
+def normalize_block(block: dict) -> dict:
+    """Normalize block structure for frontend compatibility.
+
+    Converts Claude's 'content' property to 'text' for text blocks,
+    as the frontend expects 'text' property.
+
+    Args:
+        block: Block dictionary from Claude's response
+
+    Returns:
+        Normalized block with 'text' property for text blocks
+    """
+    if block.get("type") == "text":
+        # Convert 'content' to 'text' if present
+        if "content" in block and "text" not in block:
+            block["text"] = block.pop("content")
+        # Ensure text is a string
+        if "text" in block and not isinstance(block["text"], str):
+            block["text"] = str(block["text"])
+    return block
 
 
 async def handle_tool_call(
@@ -782,6 +813,9 @@ async def stream_claude_response(
                     # Ensure block has an id
                     if "id" not in block:
                         block["id"] = str(uuid4())
+
+                    # Normalize block structure for frontend compatibility
+                    block = normalize_block(block)
 
                     logger.info(f"[WS] Sending block: type={block.get('type')}, id={block.get('id')}")
 

@@ -844,6 +844,10 @@ async def stream_claude_response(
             # to prevent duplicate workflow triggers
             tool_already_triggered = False
 
+            # Flag: Should we save this message to DB?
+            # Set to False if tool is still investigating (async)
+            should_save_message = True
+
             async for chunk in service.stream_with_tool_detection(conversation):
                 if chunk.type == "text" and chunk.content:
                     full_response += chunk.content
@@ -855,23 +859,23 @@ async def stream_claude_response(
                         f"id={tool_req.tool_id}, input={tool_req.tool_input}"
                     )
 
-                    # Guard: Skip if we've already triggered a tool for this response
-                    if tool_already_triggered:
-                        logger.warning(
-                            f"[WS] Skipping duplicate tool trigger for {tool_req.tool_name} "
-                            f"(already triggered for this response)"
-                        )
-                        continue
-
                     if tool_req.tool_name == "explore_codebase":
-                        tool_already_triggered = True
+                        # Guard: Skip if we've already triggered a tool for this response
+                        if tool_already_triggered:
+                            logger.warning(
+                                f"[WS] Skipping duplicate tool trigger for {tool_req.tool_name} "
+                                f"(already triggered for this response)"
+                            )
+                            continue
+
+                        tool_already_triggered = True  # Set BEFORE execution
 
                         # Notify frontend about tool execution
                         await websocket.send_json({
                             "type": "tool_executing",
                             "tool_name": "explore_codebase",
                             "tool_id": tool_req.tool_id,
-                            "status": "started",
+                            "status": "executing",
                             "message": "Investigating codebase..."
                         })
 
@@ -887,12 +891,19 @@ async def stream_claude_response(
 
                         logger.warning(f"[WS] Tool result: {tool_result}")
 
-                        # Continue conversation with tool result
-                        # Note: For async tools like explore_codebase, the result
-                        # contains exploration_id and status, not actual findings.
-                        # The actual results come via webhook/polling later.
-                        # For now, we'll inform Claude about the initiated exploration.
+                        # Check if tool is still running (async tools like explore_codebase)
+                        if tool_result.get("status") == "investigating":
+                            logger.info(
+                                f"[WS] Tool {tool_req.tool_name} is running asynchronously. "
+                                "Will not continue conversation now - waiting for actual results."
+                            )
+                            # Don't continue - leave the message as-is with "Investigating" status
+                            # The polling service will send actual results later via exploration_results
+                            # which will trigger a new synthesis response from Claude
+                            should_save_message = False  # Don't save empty message
+                            break  # Exit the stream loop
 
+                        # For synchronous tools or completed results, continue conversation
                         tool_continuation = ""
                         async for cont_chunk in service.continue_with_tool_result(
                             tool_id=tool_req.tool_id,
@@ -915,62 +926,65 @@ async def stream_claude_response(
                     logger.info("[WS] Stream complete signal received")
                     break
 
-            # Parse JSON response
-            response_data = None
-            try:
-                # Extract JSON from markdown code blocks if present
-                json_text = extract_json_from_markdown(full_response)
-                response_data = json.loads(json_text)
-                blocks = response_data.get("blocks", [])
+            # Parse JSON response and save to DB only if we should
+            if should_save_message:
+                response_data = None
+                try:
+                    # Extract JSON from markdown code blocks if present
+                    json_text = extract_json_from_markdown(full_response)
+                    response_data = json.loads(json_text)
+                    blocks = response_data.get("blocks", [])
 
-                # Send blocks incrementally
-                for block in blocks:
-                    # Ensure block has an id
-                    if "id" not in block:
-                        block["id"] = str(uuid4())
+                    # Send blocks incrementally
+                    for block in blocks:
+                        # Ensure block has an id
+                        if "id" not in block:
+                            block["id"] = str(uuid4())
 
-                    # Normalize block structure for frontend compatibility
-                    block = normalize_block(block)
+                        # Normalize block structure for frontend compatibility
+                        block = normalize_block(block)
 
-                    logger.info(f"[WS] Sending block: type={block.get('type')}, id={block.get('id')}")
+                        logger.info(f"[WS] Sending block: type={block.get('type')}, id={block.get('id')}")
 
+                        await websocket.send_json({
+                            "type": "stream_chunk",
+                            "message_id": message_id,
+                            "block": block
+                        })
+                        collected_blocks.append(block)
+
+                except json.JSONDecodeError as e:
+                    # Fallback: treat as plain text
+                    logger.warning(f"[WS] Claude response not valid JSON: {e}, treating as text")
+                    text_block = {
+                        "id": str(uuid4()),
+                        "type": "text",
+                        "text": full_response
+                    }
                     await websocket.send_json({
                         "type": "stream_chunk",
                         "message_id": message_id,
-                        "block": block
+                        "block": text_block
                     })
-                    collected_blocks.append(block)
+                    collected_blocks.append(text_block)
 
-            except json.JSONDecodeError as e:
-                # Fallback: treat as plain text
-                logger.warning(f"[WS] Claude response not valid JSON: {e}, treating as text")
-                text_block = {
-                    "id": str(uuid4()),
-                    "type": "text",
-                    "text": full_response
-                }
-                await websocket.send_json({
-                    "type": "stream_chunk",
-                    "message_id": message_id,
-                    "block": text_block
-                })
-                collected_blocks.append(text_block)
+                # Save to database
+                assistant_message = BrainstormMessage(
+                    id=message_id,
+                    session_id=session_id,
+                    role="assistant",
+                    content={
+                        "blocks": collected_blocks,
+                        "metadata": response_data.get("metadata", {}) if isinstance(response_data, dict) else {}
+                    }
+                )
+                db.add(assistant_message)
+                await db.commit()
 
-            # Save to database
-            assistant_message = BrainstormMessage(
-                id=message_id,
-                session_id=session_id,
-                role="assistant",
-                content={
-                    "blocks": collected_blocks,
-                    "metadata": response_data.get("metadata", {}) if isinstance(response_data, dict) else {}
-                }
-            )
-            db.add(assistant_message)
-            await db.commit()
-
-            # Auto-generate title/description if still default and we have enough context
-            await auto_generate_session_metadata(db, session_id, messages + [assistant_message])
+                # Auto-generate title/description if still default and we have enough context
+                await auto_generate_session_metadata(db, session_id, messages + [assistant_message])
+            else:
+                logger.info("[WS] Skipping message save - tool is still investigating")
 
             # Signal completion
             await websocket.send_json({

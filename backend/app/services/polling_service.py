@@ -375,7 +375,7 @@ class AnalysisPollingService:
             exploration_service = CodebaseExplorationService()
 
             # Download artifact with exploration-specific name
-            artifact_name = "exploration-result"
+            artifact_name = f"exploration-results-{exploration.id}"
             logger.debug(
                 f"Polling exploration {exploration.id}: downloading artifact '{artifact_name}'"
             )

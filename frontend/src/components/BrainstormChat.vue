@@ -10,7 +10,7 @@
           <div class="flex flex-col items-baseline gap-2">
             <h2 class="text-lg font-semibold truncate">{{ currentSession.title }}</h2>
             <span class="text-sm text-muted-foreground truncate">{{ currentSession.description }}</span>
-          </div>
+          </div>3
         </div>
         <Badge :variant="getStatusVariant(currentSession.status)" class="shrink-0">
           {{ currentSession.status }}

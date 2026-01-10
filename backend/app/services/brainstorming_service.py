@@ -1,11 +1,18 @@
-"""Service for AI-powered brainstorming with direct Anthropic API (tools support)."""
+"""Service for AI-powered brainstorming with Claude Agent SDK.
+
+Uses claude_agent_sdk which works with Claude Code credentials.
+Tool calls are detected via structured output parsing (JSON format in responses).
+"""
 import json
 import logging
 import os
+import re
+import uuid
 from dataclasses import dataclass
 from typing import AsyncGenerator, Any, TYPE_CHECKING
 
-from anthropic import AsyncAnthropic
+from claude_agent_sdk import ClaudeSDKClient
+from claude_agent_sdk.types import ClaudeAgentOptions, AssistantMessage, TextBlock
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +23,9 @@ if TYPE_CHECKING:
     from app.services.agent_factory import AgentFactory
 
 logger = logging.getLogger(__name__)
+
+# Pattern to detect tool call JSON in Claude's response
+TOOL_CALL_PATTERN = r'\{"tool_call":\s*"explore_codebase"[^}]+\}'
 
 
 @dataclass
@@ -37,11 +47,37 @@ class StreamChunk:
 
 
 class BrainstormingService:
-    """Service for brainstorming with Claude via streaming using direct Anthropic API.
+    """Service for brainstorming with Claude via streaming using Claude Agent SDK.
 
-    This service uses the direct Anthropic API instead of Claude Agent SDK
-    to support custom tool definitions with full input schemas.
+    This service uses claude_agent_sdk which works with Claude Code credentials.
+    Tool calls are detected via structured output parsing - Claude outputs a
+    special JSON format when it wants to use tools, and we parse and execute them.
     """
+
+    # Tool invocation instruction to add to system prompt
+    TOOL_INVOCATION_INSTRUCTION = """
+
+## Tool Invocation Format
+
+When you need to explore the codebase to understand existing patterns, implementations,
+or architecture, output the following JSON block on its own line BEFORE your regular response:
+
+{"tool_call": "explore_codebase", "query": "your query here", "scope": "backend", "focus": "patterns"}
+
+Parameters:
+- query: What you want to learn about the codebase (required)
+- scope: "backend", "frontend", or "full" (optional, default: "full")
+- focus: "patterns", "dependencies", or "architecture" (optional, default: "patterns")
+
+Example:
+{"tool_call": "explore_codebase", "query": "How is user authentication implemented?", "scope": "backend", "focus": "patterns"}
+
+After outputting this, wait for the results before continuing your response.
+The tool results will be provided to you, and you should incorporate them into your analysis.
+
+IMPORTANT: Output ONLY the JSON on its own line when calling tools, no markdown code blocks around it.
+
+"""
 
     SYSTEM_PROMPT = """You are an AI Product Discovery facilitator helping a Product Manager define a concrete, actionable feature.
 
@@ -251,7 +287,7 @@ A list of items the user can select multiple options from.
 ```
 I can help you explore this feature. What would you like to focus on?
 ```
-❌ This is not valid - responses MUST be JSON objects with a "blocks" array.
+This is not valid - responses MUST be JSON objects with a "blocks" array.
 
 ### Bad: Interactive Block Without Context Text
 ```json
@@ -267,9 +303,9 @@ I can help you explore this feature. What would you like to focus on?
   ]
 }
 ```
-❌ CRITICAL ERROR: No text block explaining what the user is being asked to choose.
-❌ The user sees buttons but doesn't know the question or context.
-❌ ALWAYS include a text block first explaining the question.
+CRITICAL ERROR: No text block explaining what the user is being asked to choose.
+The user sees buttons but doesn't know the question or context.
+ALWAYS include a text block first explaining the question.
 
 ### Bad: Too Many Interactive Elements
 ```json
@@ -290,7 +326,7 @@ I can help you explore this feature. What would you like to focus on?
   ]
 }
 ```
-❌ Don't use multiple interactive blocks in one response.
+Don't use multiple interactive blocks in one response.
 
 You have access to WebSearch and WebFetch tools for research."""
 
@@ -298,7 +334,7 @@ You have access to WebSearch and WebFetch tools for research."""
         self,
         api_key: str,
         db: AsyncSession | None = None,
-        agent_factory: "AgentFactory | None" = None,  # noqa: F821
+        agent_factory: "AgentFactory | None" = None,
         agent_name: str = "brainstorm",
         model: str = "claude-sonnet-4-20250514"
     ) -> None:
@@ -318,30 +354,40 @@ You have access to WebSearch and WebFetch tools for research."""
         self.agent_name = agent_name
         self.model = model
 
-        # Create Anthropic client
-        self.client = AsyncAnthropic(api_key=api_key)
-        logger.warning("[SERVICE] AsyncAnthropic client initialized")
+        # Set API key in environment for Claude SDK
+        os.environ['ANTHROPIC_API_KEY'] = api_key
 
-        # Cache for agent config and tools
+        # Client will be created lazily when we know the system prompt
+        self.client: ClaudeSDKClient | None = None
+        self.connected = False
+        logger.warning("[SERVICE] BrainstormingService initialized (client pending)")
+
+        # Cache for agent config
         self._agent_config: AgentType | None = None
-        self._tools: list[dict[str, Any]] | None = None
+        self._cached_system_prompt: str | None = None
 
         # Conversation state for tool continuations
         self._conversation_messages: list[dict[str, Any]] = []
+        self._pending_tool_result: dict[str, Any] | None = None
         self._last_assistant_content: list[dict[str, Any]] = []
 
     async def _load_agent_config(self) -> tuple[str, str]:
         """Load agent configuration from database.
 
         Returns:
-            Tuple of (system_prompt, model)
+            Tuple of (system_prompt, model) with tool invocation instructions appended
         """
         if self._agent_config:
-            return self._agent_config.system_prompt, self._agent_config.model
+            base_prompt = self._agent_config.system_prompt
+            model = self._agent_config.model
+            # Append tool invocation instructions
+            full_prompt = base_prompt + self.TOOL_INVOCATION_INSTRUCTION
+            return full_prompt, model
 
         if not self.db:
             logger.warning("[SERVICE] No DB session, using default system prompt")
-            return self.SYSTEM_PROMPT, self.model
+            full_prompt = self.SYSTEM_PROMPT + self.TOOL_INVOCATION_INSTRUCTION
+            return full_prompt, self.model
 
         result = await self.db.execute(
             select(AgentType).where(AgentType.name == self.agent_name)
@@ -351,67 +397,94 @@ You have access to WebSearch and WebFetch tools for research."""
         if agent:
             self._agent_config = agent
             logger.info(f"[SERVICE] Loaded agent config: {agent.name}, model={agent.model}")
-            return agent.system_prompt, agent.model
+            # Append tool invocation instructions to agent's system prompt
+            full_prompt = agent.system_prompt + self.TOOL_INVOCATION_INSTRUCTION
+            return full_prompt, agent.model
 
         logger.warning(f"[SERVICE] Agent '{self.agent_name}' not found, using defaults")
-        return self.SYSTEM_PROMPT, self.model
+        full_prompt = self.SYSTEM_PROMPT + self.TOOL_INVOCATION_INSTRUCTION
+        return full_prompt, self.model
 
-    async def _load_tools(self) -> list[dict[str, Any]]:
-        """Load tools for this agent from database.
+    async def _ensure_client(self) -> ClaudeSDKClient:
+        """Ensure client is created and connected.
 
         Returns:
-            List of tool definitions in Anthropic API format
+            Connected ClaudeSDKClient instance
         """
-        if self._tools is not None:
-            return self._tools
+        if self.client is None:
+            # Load config to get system prompt and model
+            system_prompt, model = await self._load_agent_config()
+            self._cached_system_prompt = system_prompt
 
-        if not self.db:
-            logger.warning("[SERVICE] No DB session, no tools available")
-            self._tools = []
-            return self._tools
+            # Create client with options
+            options = ClaudeAgentOptions(
+                model=model,
+                system_prompt=system_prompt,
+            )
+            self.client = ClaudeSDKClient(options=options)
+            logger.warning(f"[SERVICE] ClaudeSDKClient created with model={model}")
 
-        # Get agent config first
-        system_prompt, _ = await self._load_agent_config()
+        if not self.connected:
+            await self.client.connect()
+            self.connected = True
+            logger.warning("[SERVICE] ClaudeSDKClient connected")
 
-        if not self._agent_config:
-            logger.warning("[SERVICE] No agent config, no tools available")
-            self._tools = []
-            return self._tools
+        return self.client
 
-        # Load tools from database
-        tools_service = ToolsService(self.db)
-        db_tools = await tools_service.get_tools_for_agent(
-            self._agent_config.id,
-            enabled_only=True
-        )
+    def _detect_tool_call(self, text: str) -> dict[str, Any] | None:
+        """Detect tool call JSON in text.
 
-        # Convert to Anthropic API format
-        anthropic_tools = []
-        for tool in db_tools:
-            # Tool definition should contain input_schema
-            definition = tool.get("definition", {}) if isinstance(tool, dict) else {}
+        Args:
+            text: Text that may contain tool call JSON
 
-            if "input_schema" in definition:
-                anthropic_tool = {
-                    "name": tool["name"],
-                    "description": tool.get("description", ""),
-                    "input_schema": definition["input_schema"]
-                }
-                anthropic_tools.append(anthropic_tool)
-                logger.info(f"[SERVICE] Loaded tool: {tool['name']}")
-            else:
-                logger.warning(
-                    f"[SERVICE] Tool '{tool.get('name', 'unknown')}' missing input_schema, skipped"
-                )
+        Returns:
+            Parsed tool call dict if found, None otherwise
+        """
+        match = re.search(TOOL_CALL_PATTERN, text)
+        if match:
+            try:
+                tool_call = json.loads(match.group(0))
+                if tool_call.get("tool_call") == "explore_codebase":
+                    return tool_call
+            except json.JSONDecodeError:
+                logger.warning(f"[SERVICE] Failed to parse tool call JSON: {match.group(0)}")
+        return None
 
-        self._tools = anthropic_tools
-        logger.info(f"[SERVICE] Loaded {len(anthropic_tools)} tools for agent '{self.agent_name}'")
-        return self._tools
+    def _extract_tool_calls(self, text: str) -> tuple[list[dict], str]:
+        """Extract tool call JSON objects from text.
+
+        Args:
+            text: Response text that may contain tool call JSON
+
+        Returns:
+            Tuple of (list of tool call dicts, cleaned text without tool calls)
+        """
+        tool_calls = []
+        cleaned_text = text
+
+        # Find all tool call patterns
+        for match in re.finditer(TOOL_CALL_PATTERN, text):
+            tool_json = match.group(0)
+            try:
+                tool_call = json.loads(tool_json)
+                if tool_call.get("tool_call") == "explore_codebase":
+                    tool_calls.append(tool_call)
+                    # Remove the tool call from the text
+                    cleaned_text = cleaned_text.replace(tool_json, "")
+            except json.JSONDecodeError:
+                logger.warning(f"[SERVICE] Failed to parse tool call JSON: {tool_json}")
+
+        # Clean up any extra whitespace from removed tool calls
+        cleaned_text = re.sub(r'\n\s*\n', '\n\n', cleaned_text.strip())
+
+        return tool_calls, cleaned_text
 
     async def stream_brainstorm_message(
         self, messages: list[dict[str, str]]
     ) -> AsyncGenerator[str, None]:
         """Stream a brainstorm response from Claude (text only, no tool detection).
+
+        Uses Claude Agent SDK for streaming responses.
 
         Args:
             messages: Conversation history with role and content
@@ -421,26 +494,30 @@ You have access to WebSearch and WebFetch tools for research."""
         """
         logger.warning("[BRAINSTORM] stream_brainstorm_message CALLED")
         try:
-            # Load configuration
-            system_prompt, model = await self._load_agent_config()
+            # Ensure client is ready
+            client = await self._ensure_client()
 
-            # Convert messages to Anthropic format
-            api_messages = [
-                {"role": msg["role"], "content": msg["content"]}
-                for msg in messages
-            ]
+            # Build conversation prompt from messages
+            prompt_parts = []
+            for msg in messages:
+                role = msg["role"]
+                content = msg["content"]
+                if role == "user":
+                    prompt_parts.append(f"User: {content}")
+                else:
+                    prompt_parts.append(f"Assistant: {content}")
 
-            logger.warning(f"[BRAINSTORM] Sending to {model} with {len(api_messages)} messages")
+            prompt = "\n\n".join(prompt_parts)
+            logger.warning(f"[BRAINSTORM] Sending prompt with {len(messages)} messages")
 
-            # Stream response using direct Anthropic API
-            async with self.client.messages.stream(
-                model=model,
-                max_tokens=4096,
-                system=system_prompt,
-                messages=api_messages,
-            ) as stream:
-                async for text in stream.text_stream:
-                    yield text
+            # Send query and stream response
+            await client.query(prompt)
+
+            async for msg in client.receive_response():
+                if isinstance(msg, AssistantMessage):
+                    for block in msg.content:
+                        if isinstance(block, TextBlock):
+                            yield block.text
 
             logger.warning("[BRAINSTORM] Stream complete")
 
@@ -453,9 +530,8 @@ You have access to WebSearch and WebFetch tools for research."""
     ) -> AsyncGenerator[StreamChunk, None]:
         """Stream a brainstorm response from Claude with tool use detection.
 
-        Uses the direct Anthropic API with full tool definitions (input schemas).
-        Properly handles streaming events including tool_use blocks with
-        input accumulation from delta events.
+        Uses Claude Agent SDK for streaming. Detects tool calls by parsing
+        JSON patterns in the streamed text.
 
         Args:
             messages: Conversation history with role and content
@@ -465,119 +541,81 @@ You have access to WebSearch and WebFetch tools for research."""
         """
         logger.warning("[BRAINSTORM] stream_with_tool_detection CALLED")
         try:
-            # Load configuration and tools
-            system_prompt, model = await self._load_agent_config()
-            tools = await self._load_tools()
+            # Ensure client is ready
+            client = await self._ensure_client()
 
-            # Convert messages to Anthropic format
-            api_messages = [
-                {"role": msg["role"], "content": msg["content"]}
-                for msg in messages
-            ]
+            # Build conversation prompt from messages
+            prompt_parts = []
+            for msg in messages:
+                role = msg["role"]
+                content = msg["content"]
+                if role == "user":
+                    prompt_parts.append(f"User: {content}")
+                else:
+                    prompt_parts.append(f"Assistant: {content}")
+
+            prompt = "\n\n".join(prompt_parts)
 
             # Store for tool continuations
-            self._conversation_messages = api_messages.copy()
+            self._conversation_messages = messages.copy()
 
-            logger.warning(
-                f"[BRAINSTORM] Sending to {model} with {len(api_messages)} messages "
-                f"and {len(tools)} tools"
-            )
+            logger.warning(f"[BRAINSTORM] Sending prompt with {len(messages)} messages")
 
-            # Build request kwargs
-            request_kwargs: dict[str, Any] = {
-                "model": model,
-                "max_tokens": 4096,
-                "system": system_prompt,
-                "messages": api_messages,
-            }
-            if tools:
-                request_kwargs["tools"] = tools
+            # Send query and stream response
+            await client.query(prompt)
 
-            # Track current tool use block being streamed
-            current_tool_id: str | None = None
-            current_tool_name: str | None = None
-            current_tool_input_json: str = ""
+            # Buffer for tool call detection
+            full_text = ""
+            tool_detected = False
+            pending_text = ""
 
-            # Track all content blocks for conversation continuity
-            assistant_content_blocks: list[dict[str, Any]] = []
+            async for msg in client.receive_response():
+                if isinstance(msg, AssistantMessage):
+                    for block in msg.content:
+                        if isinstance(block, TextBlock):
+                            text_chunk = block.text
+                            full_text += text_chunk
+                            pending_text += text_chunk
 
-            # Stream response using direct Anthropic API
-            async with self.client.messages.stream(**request_kwargs) as stream:
-                async for event in stream:
-                    event_type = event.type
+                            # Check for tool call in accumulated text
+                            if not tool_detected:
+                                tool_call = self._detect_tool_call(full_text)
+                                if tool_call:
+                                    tool_detected = True
+                                    logger.warning(
+                                        f"[BRAINSTORM] Tool call detected: {tool_call}"
+                                    )
 
-                    if event_type == "content_block_start":
-                        # New content block starting
-                        block = event.content_block
-                        if block.type == "text":
-                            # Text block - nothing special to do on start
-                            pass
-                        elif block.type == "tool_use":
-                            # Tool use block starting
-                            current_tool_id = block.id
-                            current_tool_name = block.name
-                            current_tool_input_json = ""
-                            logger.warning(
-                                f"[BRAINSTORM] Tool use block started: "
-                                f"name={current_tool_name}, id={current_tool_id}"
-                            )
+                                    # Yield tool use request
+                                    yield StreamChunk(
+                                        type="tool_use",
+                                        tool_use=ToolUseRequest(
+                                            tool_name="explore_codebase",
+                                            tool_id=str(uuid.uuid4()),
+                                            tool_input={
+                                                "query": tool_call.get("query", ""),
+                                                "scope": tool_call.get("scope", "full"),
+                                                "focus": tool_call.get("focus", "patterns")
+                                            }
+                                        )
+                                    )
 
-                    elif event_type == "content_block_delta":
-                        delta = event.delta
-                        if delta.type == "text_delta":
-                            # Text content delta
-                            yield StreamChunk(type="text", content=delta.text)
-                        elif delta.type == "input_json_delta":
-                            # Tool input JSON delta - accumulate
-                            current_tool_input_json += delta.partial_json
+                                    # Remove the tool call JSON from pending text
+                                    _, clean_text = self._extract_tool_calls(pending_text)
+                                    if clean_text.strip():
+                                        yield StreamChunk(type="text", content=clean_text)
+                                    pending_text = ""
+                                    continue
 
-                    elif event_type == "content_block_stop":
-                        # Content block finished
-                        if current_tool_id and current_tool_name:
-                            # Parse accumulated JSON input
-                            try:
-                                tool_input = json.loads(current_tool_input_json) if current_tool_input_json else {}
-                            except json.JSONDecodeError:
-                                logger.error(
-                                    f"[BRAINSTORM] Failed to parse tool input JSON: "
-                                    f"{current_tool_input_json[:200]}"
-                                )
-                                tool_input = {}
+                            # If no tool detected yet, yield text chunks
+                            # But filter out any tool call JSON that might be present
+                            if not tool_detected:
+                                _, clean_chunk = self._extract_tool_calls(text_chunk)
+                                if clean_chunk:
+                                    yield StreamChunk(type="text", content=clean_chunk)
 
-                            logger.warning(
-                                f"[BRAINSTORM] Tool use complete: name={current_tool_name}, "
-                                f"id={current_tool_id}, input={tool_input}"
-                            )
-
-                            # Store tool use block for continuation
-                            assistant_content_blocks.append({
-                                "type": "tool_use",
-                                "id": current_tool_id,
-                                "name": current_tool_name,
-                                "input": tool_input
-                            })
-
-                            # Yield the tool use request
-                            yield StreamChunk(
-                                type="tool_use",
-                                tool_use=ToolUseRequest(
-                                    tool_name=current_tool_name,
-                                    tool_id=current_tool_id,
-                                    tool_input=tool_input
-                                )
-                            )
-
-                            # Reset tool tracking
-                            current_tool_id = None
-                            current_tool_name = None
-                            current_tool_input_json = ""
-
-                    elif event_type == "message_stop":
-                        # Message complete
-                        logger.warning("[BRAINSTORM] Message stop event received")
-
-            # Store assistant content for potential tool continuations
-            self._last_assistant_content = assistant_content_blocks
+            # Store for potential tool result continuations
+            self._last_assistant_content = [{"type": "text", "text": full_text}]
 
             yield StreamChunk(type="complete")
             logger.warning("[BRAINSTORM] Stream complete")
@@ -593,7 +631,7 @@ You have access to WebSearch and WebFetch tools for research."""
     ) -> AsyncGenerator[StreamChunk, None]:
         """Continue the conversation after a tool has been executed.
 
-        Uses the direct Anthropic API to send tool results back and get
+        Uses Claude Agent SDK to send tool results back and get
         Claude's continued response.
 
         Args:
@@ -610,125 +648,82 @@ You have access to WebSearch and WebFetch tools for research."""
                 "No conversation context. Call stream_with_tool_detection first."
             )
 
-        # Load configuration and tools
-        system_prompt, model = await self._load_agent_config()
-        tools = await self._load_tools()
+        try:
+            # Ensure client is ready
+            client = await self._ensure_client()
 
-        # Build the continuation messages:
-        # 1. Original conversation
-        # 2. Assistant's response with tool_use
-        # 3. User's tool_result
-        continuation_messages = self._conversation_messages.copy()
+            # Build continuation prompt with tool result
+            tool_result_str = json.dumps(tool_result, indent=2)
+            continuation_prompt = f"""Tool result for explore_codebase:
 
-        # Add assistant message with tool_use content
-        if self._last_assistant_content:
-            continuation_messages.append({
-                "role": "assistant",
-                "content": self._last_assistant_content
-            })
+{tool_result_str}
 
-        # Add tool result as user message
-        continuation_messages.append({
-            "role": "user",
-            "content": [{
-                "type": "tool_result",
-                "tool_use_id": tool_id,
-                "content": json.dumps(tool_result)
-            }]
-        })
+Please continue your response, incorporating this information."""
 
-        logger.warning(
-            f"[BRAINSTORM] Continuing with tool result, "
-            f"{len(continuation_messages)} messages total"
-        )
+            logger.warning(
+                f"[BRAINSTORM] Continuing with tool result, sending new query"
+            )
 
-        # Build request kwargs
-        request_kwargs: dict[str, Any] = {
-            "model": model,
-            "max_tokens": 4096,
-            "system": system_prompt,
-            "messages": continuation_messages,
-        }
-        if tools:
-            request_kwargs["tools"] = tools
+            # Send continuation query
+            await client.query(continuation_prompt)
 
-        # Track current tool use block being streamed
-        current_tool_id: str | None = None
-        current_tool_name: str | None = None
-        current_tool_input_json: str = ""
+            # Track for nested tool calls
+            full_text = ""
+            tool_detected = False
 
-        # Track content blocks for potential nested tool calls
-        assistant_content_blocks: list[dict[str, Any]] = []
+            async for msg in client.receive_response():
+                if isinstance(msg, AssistantMessage):
+                    for block in msg.content:
+                        if isinstance(block, TextBlock):
+                            text_chunk = block.text
+                            full_text += text_chunk
 
-        # Stream response
-        async with self.client.messages.stream(**request_kwargs) as stream:
-            async for event in stream:
-                event_type = event.type
+                            # Check for nested tool call
+                            if not tool_detected:
+                                tool_call = self._detect_tool_call(full_text)
+                                if tool_call:
+                                    tool_detected = True
+                                    logger.warning(
+                                        f"[BRAINSTORM] Nested tool call in continuation: {tool_call}"
+                                    )
+                                    yield StreamChunk(
+                                        type="tool_use",
+                                        tool_use=ToolUseRequest(
+                                            tool_name="explore_codebase",
+                                            tool_id=str(uuid.uuid4()),
+                                            tool_input={
+                                                "query": tool_call.get("query", ""),
+                                                "scope": tool_call.get("scope", "full"),
+                                                "focus": tool_call.get("focus", "patterns")
+                                            }
+                                        )
+                                    )
+                                    continue
 
-                if event_type == "content_block_start":
-                    block = event.content_block
-                    if block.type == "tool_use":
-                        current_tool_id = block.id
-                        current_tool_name = block.name
-                        current_tool_input_json = ""
-                        logger.warning(
-                            f"[BRAINSTORM] Tool use block started in continuation: "
-                            f"name={current_tool_name}, id={current_tool_id}"
-                        )
+                            # Yield text chunks, filtering tool call JSON
+                            _, clean_chunk = self._extract_tool_calls(text_chunk)
+                            if clean_chunk:
+                                yield StreamChunk(type="text", content=clean_chunk)
 
-                elif event_type == "content_block_delta":
-                    delta = event.delta
-                    if delta.type == "text_delta":
-                        yield StreamChunk(type="text", content=delta.text)
-                    elif delta.type == "input_json_delta":
-                        current_tool_input_json += delta.partial_json
+            # Update conversation state
+            self._last_assistant_content = [{"type": "text", "text": full_text}]
 
-                elif event_type == "content_block_stop":
-                    if current_tool_id and current_tool_name:
-                        try:
-                            tool_input = json.loads(current_tool_input_json) if current_tool_input_json else {}
-                        except json.JSONDecodeError:
-                            tool_input = {}
+            yield StreamChunk(type="complete")
+            logger.warning("[BRAINSTORM] Tool result continuation complete")
 
-                        logger.warning(
-                            f"[BRAINSTORM] Tool use in continuation: "
-                            f"name={current_tool_name}, id={current_tool_id}"
-                        )
-
-                        assistant_content_blocks.append({
-                            "type": "tool_use",
-                            "id": current_tool_id,
-                            "name": current_tool_name,
-                            "input": tool_input
-                        })
-
-                        yield StreamChunk(
-                            type="tool_use",
-                            tool_use=ToolUseRequest(
-                                tool_name=current_tool_name,
-                                tool_id=current_tool_id,
-                                tool_input=tool_input
-                            )
-                        )
-
-                        current_tool_id = None
-                        current_tool_name = None
-                        current_tool_input_json = ""
-
-                elif event_type == "message_stop":
-                    logger.warning("[BRAINSTORM] Continuation message stop")
-
-        # Update conversation state for potential further continuations
-        self._conversation_messages = continuation_messages
-        self._last_assistant_content = assistant_content_blocks
-
-        yield StreamChunk(type="complete")
-        logger.warning("[BRAINSTORM] Tool result continuation complete")
+        except Exception as e:
+            logger.error(f"[BRAINSTORM] Error in continue_with_tool_result: {e}", exc_info=True)
+            raise
 
     async def close(self) -> None:
         """Close the service and cleanup resources."""
-        # AsyncAnthropic client doesn't require explicit cleanup
-        # Reset conversation state
+        if self.client and self.connected:
+            try:
+                await self.client.disconnect()
+            except Exception as e:
+                logger.warning(f"[SERVICE] Error disconnecting client: {e}")
+
+        self.connected = False
         self._conversation_messages = []
         self._last_assistant_content = []
         logger.warning("[SERVICE] Closed and reset conversation state")

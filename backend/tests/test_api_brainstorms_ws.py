@@ -56,13 +56,14 @@ async def test_websocket_handles_user_message(db_session):
 
         # Should receive stream_chunk or stream_complete
         response = websocket.receive_json()
-        assert response["type"] in ["stream_chunk", "stream_complete", "error"]
+        assert response["type"] in ["stream_chunk", "stream_complete", "error", "user_message_saved"]
 
 
 @pytest.mark.asyncio
 async def test_handles_malformed_json_gracefully():
     """Should fallback to text block when Claude returns invalid JSON."""
     from unittest.mock import AsyncMock, MagicMock, patch
+    from app.services.brainstorming_service import StreamChunk
 
     # Test the JSON parsing logic directly
     from app.api.brainstorms import stream_claude_response
@@ -91,21 +92,19 @@ async def test_handles_malformed_json_gracefully():
     mock_db.commit = mock_commit
     mock_db.add = MagicMock()
 
-    # Mock BrainstormingService to return malformed JSON
-    async def mock_stream_generator(conversation):
-        yield "This is not JSON, just plain text"
+    # Mock BrainstormingService to return malformed JSON via stream_with_tool_detection
+    async def mock_stream_with_tool_detection(conversation):
+        yield StreamChunk(type="text", content="This is not JSON, just plain text")
+        yield StreamChunk(type="complete")
 
     mock_service_instance = MagicMock()
-    mock_service_instance.stream_brainstorm_message = mock_stream_generator
+    mock_service_instance.stream_with_tool_detection = mock_stream_with_tool_detection
     mock_service_instance.__aenter__ = AsyncMock(return_value=mock_service_instance)
     mock_service_instance.__aexit__ = AsyncMock(return_value=None)
 
-    # Create mock agent factory
-    mock_agent_factory = MagicMock()
-
     with patch('app.api.brainstorms.BrainstormingService', return_value=mock_service_instance):
         # Call the function directly
-        await stream_claude_response(mock_websocket, mock_db, "test-session", mock_agent_factory)
+        await stream_claude_response(mock_websocket, mock_db, "test-session")
 
     # Verify fallback text block was sent
     assert len(sent_messages) >= 1
@@ -124,6 +123,7 @@ async def test_handles_dict_in_text_block():
     from unittest.mock import AsyncMock, MagicMock, patch
     from app.api.brainstorms import stream_claude_response
     from app.models.brainstorm import BrainstormMessage
+    from app.services.brainstorming_service import StreamChunk
 
     # Create mock websocket
     mock_websocket = MagicMock()
@@ -162,25 +162,24 @@ async def test_handles_dict_in_text_block():
     mock_db.commit = mock_commit
     mock_db.add = MagicMock()
 
-    # Mock BrainstormingService
-    async def mock_stream_generator(conversation):
+    # Mock BrainstormingService using stream_with_tool_detection
+    async def mock_stream_with_tool_detection(conversation):
         # Verify dict was converted to string in conversation
         assert len(conversation) == 1
         assert isinstance(conversation[0]["content"], str)
         # The dict should have been converted to JSON string
         assert "error" in conversation[0]["content"]
-        yield '{"blocks": [{"type": "text", "text": "Response"}]}'
+        yield StreamChunk(type="text", content='{"blocks": [{"type": "text", "text": "Response"}]}')
+        yield StreamChunk(type="complete")
 
     mock_service_instance = MagicMock()
-    mock_service_instance.stream_brainstorm_message = mock_stream_generator
+    mock_service_instance.stream_with_tool_detection = mock_stream_with_tool_detection
     mock_service_instance.__aenter__ = AsyncMock(return_value=mock_service_instance)
     mock_service_instance.__aexit__ = AsyncMock(return_value=None)
 
-    mock_agent_factory = MagicMock()
-
     with patch('app.api.brainstorms.BrainstormingService', return_value=mock_service_instance):
         # This should not raise "expected str instance, dict found" error
-        await stream_claude_response(mock_websocket, mock_db, "test-session", mock_agent_factory)
+        await stream_claude_response(mock_websocket, mock_db, "test-session")
 
     # Verify response was sent successfully
     assert len(sent_messages) >= 1

@@ -153,17 +153,17 @@
         <Textarea
           ref="messageInput"
           v-model="userMessage"
-          placeholder="Share your thoughts..."
-          :disabled="store.streamingMessageId !== null || loading || !isActive || interactiveElementsActive"
+          :placeholder="isExploring ? 'Waiting for exploration results...' : 'Share your thoughts...'"
+          :disabled="store.streamingMessageId !== null || loading || !isActive || interactiveElementsActive || isExploring"
           @keydown.enter.exact.prevent="handleSendMessage"
-          class="flex-1 resize-none"
+          :class="['flex-1 resize-none', isExploring ? 'opacity-60' : '']"
           rows="3"
         />
         <Button
           type="submit"
-          :disabled="store.streamingMessageId !== null || loading || !userMessage.trim() || !isActive || interactiveElementsActive"
+          :disabled="store.streamingMessageId !== null || loading || !userMessage.trim() || !isActive || interactiveElementsActive || isExploring"
           size="icon"
-          class="self-end"
+          :class="['self-end', isExploring ? 'opacity-60' : '']"
         >
           <Send class="h-4 w-4" />
         </Button>
@@ -171,7 +171,10 @@
       <p v-if="!isActive" class="text-xs text-muted-foreground mt-2">
         This session is not active
       </p>
-      <p v-if="interactiveElementsActive" class="text-xs text-muted-foreground mt-2">
+      <p v-else-if="isExploring" class="text-xs text-muted-foreground mt-2">
+        Exploring codebase...
+      </p>
+      <p v-else-if="interactiveElementsActive" class="text-xs text-muted-foreground mt-2">
         Please respond to the interactive element above
       </p>
     </div>
@@ -212,6 +215,7 @@ const isActive = computed(() => store.isActive)
 const interactiveElementsActive = computed(() => store.interactiveElementsActive)
 const currentAgentConfig = computed(() => store.currentAgentConfig)
 const activeToolExecution = computed(() => store.activeToolExecution)
+const isExploring = computed(() => activeToolExecution.value?.status === 'executing')
 
 function getStatusVariant(status: string) {
   switch (status) {

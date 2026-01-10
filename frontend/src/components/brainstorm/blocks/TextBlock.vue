@@ -3,7 +3,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import MarkdownIt from 'markdown-it'
 import sanitizer from 'markdown-it-sanitizer'
 
@@ -17,6 +18,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const router = useRouter()
 
 const md = new MarkdownIt({
   html: false,
@@ -25,8 +27,48 @@ const md = new MarkdownIt({
   breaks: true
 }).use(sanitizer)
 
+// Custom link rendering to handle internal routes
+const defaultRender = md.renderer.rules.link_open || function(tokens, idx, options, env, self) {
+  return self.renderToken(tokens, idx, options)
+}
+
+md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
+  const token = tokens[idx]
+  const hrefIndex = token.attrIndex('href')
+
+  if (hrefIndex >= 0) {
+    const href = token.attrs![hrefIndex][1]
+
+    // External links get target="_blank" and rel="noopener noreferrer"
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+      token.attrPush(['target', '_blank'])
+      token.attrPush(['rel', 'noopener noreferrer'])
+    } else {
+      // Internal links get a data attribute for client-side routing
+      token.attrPush(['data-internal-link', 'true'])
+    }
+  }
+
+  return defaultRender(tokens, idx, options, env, self)
+}
+
 const renderedHtml = computed(() => {
   return md.render(props.block.text)
+})
+
+// Handle clicks on internal links
+onMounted(() => {
+  nextTick(() => {
+    document.querySelectorAll('[data-internal-link="true"]').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault()
+        const href = (e.target as HTMLAnchorElement).getAttribute('href')
+        if (href) {
+          router.push(href)
+        }
+      })
+    })
+  })
 })
 </script>
 
@@ -102,6 +144,7 @@ const renderedHtml = computed(() => {
 .text-block :deep(a) {
   color: rgb(59 130 246);
   text-decoration: underline;
+  cursor: pointer;
 }
 
 .text-block :deep(a:hover) {

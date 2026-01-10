@@ -105,3 +105,59 @@ describe('TextBlock', () => {
     expect(wrapper.find('a').attributes('href')).toBe('https://example.com')
   })
 })
+
+describe('TextBlock - Feature Links', () => {
+  it('renders markdown links as router-links for internal routes', () => {
+    const wrapper = mount(TextBlock, {
+      props: {
+        block: {
+          type: 'text',
+          text: '[View Feature](/features/123)'
+        }
+      },
+      global: {
+        stubs: {
+          'router-link': true
+        }
+      }
+    })
+
+    // Should convert to router-link for internal paths
+    expect(wrapper.html()).toContain('/features/123')
+  })
+
+  it('renders external links as regular anchor tags', () => {
+    const wrapper = mount(TextBlock, {
+      props: {
+        block: {
+          type: 'text',
+          text: '[External](https://example.com)'
+        }
+      }
+    })
+
+    const link = wrapper.find('a')
+    expect(link.attributes('href')).toBe('https://example.com')
+    expect(link.attributes('target')).toBe('_blank')
+    expect(link.attributes('rel')).toContain('noopener')
+  })
+
+  it('renders feature creation success message correctly', () => {
+    const wrapper = mount(TextBlock, {
+      props: {
+        block: {
+          type: 'text',
+          text: '✓ Feature created successfully!\n\nYou can view and manage it here: [Dark Mode Toggle](/features/abc-123)'
+        }
+      },
+      global: {
+        stubs: {
+          'router-link': true
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Feature created successfully')
+    expect(wrapper.text()).toContain('Dark Mode Toggle')
+  })
+})

@@ -599,6 +599,10 @@ async def handle_exploration_results(
     the results to the frontend, which then forwards them here for Claude to
     synthesize into simple, non-technical language for the PM.
 
+    IMPORTANT: The exploration results are NOT saved to the database.
+    They are passed directly to Claude as ephemeral context for synthesis.
+    This prevents the [EXPLORATION_RESULTS] message from appearing in the chat.
+
     Args:
         websocket: The WebSocket connection
         db: Database session
@@ -607,30 +611,13 @@ async def handle_exploration_results(
     """
     logger.info(f"[WS] Handling exploration results for synthesis in session {session_id}")
 
-    # Save the exploration results as a system-like context message
-    # We don't show this to the user directly, but we need it in conversation history
-    context_message = BrainstormMessage(
-        id=str(uuid4()),
-        session_id=session_id,
-        role="user",
-        content={
-            "blocks": [{
-                "id": str(uuid4()),
-                "type": "text",
-                "text": content
-            }]
-        }
+    # DO NOT save exploration results to the database - they are internal context
+    # that should not appear in the chat UI. We pass them directly to Claude.
+
+    # Stream Claude's synthesis response with the exploration context
+    await stream_claude_response_with_context(
+        websocket, db, session_id, ephemeral_context=content
     )
-    db.add(context_message)
-    await db.commit()
-    await db.refresh(context_message)
-    logger.info("[WS] Saved exploration context for synthesis")
-
-    # Note: We intentionally don't send this back as user_message_saved
-    # because it's internal context, not a user-visible message
-
-    # Stream Claude's synthesis response
-    await stream_claude_response(websocket, db, session_id)
 
 
 async def auto_generate_session_metadata(db, session_id: str, messages: list):
@@ -718,12 +705,44 @@ Return ONLY a JSON object with this exact format:
         # Not critical, just log and continue
 
 
+async def stream_claude_response_with_context(
+    websocket: WebSocket,
+    db,
+    session_id: str,
+    ephemeral_context: str,
+):
+    """Stream Claude's response with additional ephemeral context.
+
+    This is used for exploration results - the context is passed to Claude
+    but NOT saved to the database, so it won't appear in the chat UI.
+
+    Args:
+        websocket: The WebSocket connection
+        db: Database session
+        session_id: The brainstorm session ID
+        ephemeral_context: Additional context to pass to Claude (not saved to DB)
+    """
+    await stream_claude_response(
+        websocket, db, session_id, ephemeral_context=ephemeral_context
+    )
+
+
 async def stream_claude_response(
     websocket: WebSocket,
     db,
     session_id: str,
+    ephemeral_context: str | None = None,
 ):
-    """Stream Claude's response block-by-block."""
+    """Stream Claude's response block-by-block.
+
+    Args:
+        websocket: The WebSocket connection
+        db: Database session
+        session_id: The brainstorm session ID
+        ephemeral_context: Optional additional context to pass to Claude.
+            This context is NOT saved to the database and won't appear in chat.
+            Used for exploration results synthesis.
+    """
     # Get conversation history
     result = await db.execute(
         select(BrainstormMessage)
@@ -800,6 +819,12 @@ async def stream_claude_response(
                 joined_content = " ".join(text_parts)
                 logger.warning(f"[WS] ✅ Assistant content joined successfully: {joined_content[:100]}")
                 conversation.append({"role": "assistant", "content": joined_content})
+
+    # Add ephemeral context if provided (e.g., exploration results)
+    # This is NOT saved to the database, just passed to Claude for this response
+    if ephemeral_context:
+        logger.info("[WS] Adding ephemeral context to conversation (not saved to DB)")
+        conversation.append({"role": "user", "content": ephemeral_context})
 
     # Stream from Claude
     message_id = str(uuid4())

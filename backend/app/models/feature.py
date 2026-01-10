@@ -6,6 +6,9 @@ import enum
 
 from sqlalchemy import String, Text, Integer, Enum as SQLEnum, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import JSON
+from sqlalchemy.dialects.postgresql import JSONB
+from typing import Any
 
 from app.models.base import Base, TimestampMixin
 
@@ -50,6 +53,15 @@ class Feature(Base, TimestampMixin):
     # Polling tracking
     last_polled_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+    # Additional metadata (brief, source, etc.)
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSON().with_variant(JSONB(), "postgresql"),
+        nullable=False,
+        default=dict,
+        server_default="{}",
     )
 
     # Relationships

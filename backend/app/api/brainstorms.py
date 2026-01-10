@@ -460,6 +460,34 @@ async def websocket_brainstorm(
 
                 elif data["type"] == "interaction":
                     logger.info(f"[WS] Interaction data received: {data}")
+
+                    # Check if this is a brief validation interaction
+                    interaction_type = data.get("interaction_type")
+                    if interaction_type:
+                        logger.info(f"[WS] Brief validation interaction: {interaction_type}")
+                        handler = get_interaction_handler(interaction_type)
+
+                        if handler:
+                            # Extract brief_text from interaction data if present
+                            brief_text = data.get("data", {}).get("brief_text", "")
+
+                            # Call handler (some handlers need brief_text, others don't)
+                            if interaction_type in ["approve_brief", "create_feature", "save_draft"]:
+                                response = await handler(
+                                    brainstorm_id=session_id,
+                                    brief_text=brief_text,
+                                    db=db
+                                )
+                            else:
+                                response = await handler(
+                                    brainstorm_id=session_id,
+                                    db=db
+                                )
+
+                            await websocket.send_json(response)
+                            continue
+
+                    # Standard button/select interaction handling
                     block_id = data.get("block_id")
                     value = data.get("value")
 
@@ -999,3 +1027,176 @@ async def stream_claude_response(
                 "type": "error",
                 "message": f"Streaming error: {str(e)}"
             })
+
+
+# Brief Validation Interaction Handlers
+
+async def handle_brief_approval(
+    brainstorm_id: str,
+    brief_text: str,
+    db: AsyncSession
+) -> dict:
+    """
+    Handle approve_brief interaction
+    Returns button_group for feature creation options
+    """
+    return {
+        "blocks": [
+            {
+                "type": "text",
+                "text": "Great! I can help you create this feature in the system. Would you like to:"
+            },
+            {
+                "type": "button_group",
+                "buttons": [
+                    {
+                        "id": "create_feature",
+                        "label": "Create Feature in System",
+                        "variant": "primary",
+                        "data": {"brief_text": brief_text}
+                    },
+                    {
+                        "id": "save_draft",
+                        "label": "Save as Draft",
+                        "variant": "secondary",
+                        "data": {"brief_text": brief_text}
+                    }
+                ]
+            }
+        ]
+    }
+
+
+async def handle_brief_changes_request(
+    brainstorm_id: str,
+    db: AsyncSession
+) -> dict:
+    """
+    Handle request_changes interaction
+    Prompts PM to specify what changes they want
+    """
+    return {
+        "blocks": [
+            {
+                "type": "text",
+                "text": "What would you like to change about the Feature Brief? Please be specific about which sections or details need adjustment."
+            }
+        ]
+    }
+
+
+async def handle_brief_discard(
+    brainstorm_id: str,
+    db: AsyncSession
+) -> dict:
+    """
+    Handle discard_brief interaction
+    Acknowledges and asks what to explore instead
+    """
+    return {
+        "blocks": [
+            {
+                "type": "text",
+                "text": "No problem! Let's explore a different direction. What would you like to discuss instead?"
+            }
+        ]
+    }
+
+
+async def handle_feature_creation(
+    brainstorm_id: str,
+    brief_text: str,
+    db: AsyncSession
+) -> dict:
+    """
+    Handle create_feature interaction
+    Parses brief and creates Feature record in database
+    """
+    from app.services.brief_parser import BriefParser
+    from app.models.feature import Feature
+    import uuid
+
+    # Parse the brief
+    parser = BriefParser()
+    parsed = parser.parse(brief_text)
+
+    # Create feature record
+    feature = Feature(
+        id=str(uuid.uuid4()),
+        name=parsed.name,
+        description=parsed.description,
+        status="pending",
+        priority=3,  # Default priority
+        metadata_={
+            "source": "brainstorm",
+            "brainstorm_id": brainstorm_id,
+            "brief": {
+                "problem_statement": parsed.problem_statement,
+                "target_users": parsed.target_users,
+                "core_functionality": parsed.core_functionality,
+                "success_metrics": parsed.success_metrics,
+                "technical_considerations": parsed.technical_considerations
+            }
+        }
+    )
+
+    db.add(feature)
+    await db.commit()
+    await db.refresh(feature)
+
+    # Return success message with link
+    feature_url = f"/features/{feature.id}"
+
+    return {
+        "blocks": [
+            {
+                "type": "text",
+                "text": f"✓ Feature created successfully!\n\nYou can view and manage it here: [{parsed.name}]({feature_url})"
+            }
+        ]
+    }
+
+
+async def handle_save_draft(
+    brainstorm_id: str,
+    brief_text: str,
+    db: AsyncSession
+) -> dict:
+    """
+    Handle save_draft interaction
+    Stores brief in brainstorm metadata
+    """
+    # Find brainstorm
+    result = await db.execute(
+        select(BrainstormSession).where(BrainstormSession.id == brainstorm_id)
+    )
+    brainstorm = result.scalar_one_or_none()
+
+    if brainstorm:
+        # Update metadata with draft
+        if not brainstorm.metadata_:
+            brainstorm.metadata_ = {}
+
+        brainstorm.metadata_["draft_brief"] = brief_text
+        await db.commit()
+
+    return {
+        "blocks": [
+            {
+                "type": "text",
+                "text": "Draft saved! You can continue refining the brief or come back to it later."
+            }
+        ]
+    }
+
+
+def get_interaction_handler(interaction_type: str):
+    """Route interaction type to handler function"""
+    handlers = {
+        "approve_brief": handle_brief_approval,
+        "request_changes": handle_brief_changes_request,
+        "discard_brief": handle_brief_discard,
+        "create_feature": handle_feature_creation,
+        "save_draft": handle_save_draft
+    }
+    return handlers.get(interaction_type)

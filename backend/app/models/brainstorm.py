@@ -43,6 +43,13 @@ class BrainstormSession(Base, TimestampMixin):
         default=BrainstormSessionStatus.ACTIVE,
         nullable=False,
     )
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSON().with_variant(JSONB(), "postgresql"),
+        nullable=False,
+        default=dict,
+        server_default="{}",
+    )
 
     # Relationships
     messages: Mapped[list["BrainstormMessage"]] = relationship(

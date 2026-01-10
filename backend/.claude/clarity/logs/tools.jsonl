@@ -139,3 +139,5 @@
 {"event":"PostToolUse","session_id":"175226a5-dd76-44cc-8a5b-fa041a9987dc","tool_name":"TodoWrite","timestamp":"2026-01-10T01:11:25.022Z"}
 {"event":"PostToolUse","session_id":"175226a5-dd76-44cc-8a5b-fa041a9987dc","tool_name":"Task","timestamp":"2026-01-10T01:11:46.484Z"}
 {"event":"PreToolUse","session_id":"175226a5-dd76-44cc-8a5b-fa041a9987dc","tool_name":"Bash","tool_input":{"command":"cd /Users/boudydegeer/Code/@smith.ai/product-analysis && git add -A && git status --short","description":"Stage changes"},"timestamp":"2026-01-10T01:12:10.011Z"}
+{"event":"PostToolUse","session_id":"175226a5-dd76-44cc-8a5b-fa041a9987dc","tool_name":"Bash","timestamp":"2026-01-10T01:12:49.981Z"}
+{"event":"PreToolUse","session_id":"175226a5-dd76-44cc-8a5b-fa041a9987dc","tool_name":"Bash","tool_input":{"command":"cd /Users/boudydegeer/Code/@smith.ai/product-analysis && gh workflow view explore-codebase.yml --json name,path 2>&1 | head -5","description":"Check workflow exists"},"timestamp":"2026-01-10T01:31:59.187Z"}

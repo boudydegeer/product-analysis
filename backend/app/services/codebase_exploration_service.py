@@ -78,17 +78,23 @@ class CodebaseExplorationService:
             )
 
             # Build workflow inputs
-            inputs = {
+            # Note: Only send inputs defined in explore-codebase.yml
+            # session_id and message_id are for internal tracking only,
+            # not workflow inputs
+            inputs: dict[str, str] = {
                 "exploration_id": exploration_id,
                 "query": query,
-                "session_id": session_id,
-                "message_id": message_id,
             }
 
             if scope:
                 inputs["scope"] = scope
             if focus:
                 inputs["focus"] = focus
+
+            # Build callback URL if configured
+            if settings.webhook_base_url:
+                callback_url = f"{settings.webhook_base_url}/api/explorations/{exploration_id}/callback"
+                inputs["callback_url"] = callback_url
 
             # Trigger the exploration workflow
             workflow_run_id = await github_service.trigger_workflow(

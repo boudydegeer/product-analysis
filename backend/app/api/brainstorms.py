@@ -140,7 +140,9 @@ async def handle_explore_codebase(
         )
 
         # Update exploration with workflow info
-        exploration.workflow_run_id = result.get("workflow_run_id")
+        # workflow_run_id from GitHub is an integer, but the DB column expects a string
+        workflow_run_id = result.get("workflow_run_id")
+        exploration.workflow_run_id = str(workflow_run_id) if workflow_run_id is not None else None
         exploration.workflow_url = result.get("workflow_url")
         exploration.status = CodebaseExplorationStatus.INVESTIGATING
         await db.commit()

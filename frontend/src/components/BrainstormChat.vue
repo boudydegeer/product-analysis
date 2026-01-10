@@ -10,7 +10,7 @@
           <div class="flex flex-col items-baseline gap-2">
             <h2 class="text-lg font-semibold truncate">{{ currentSession.title }}</h2>
             <span class="text-sm text-muted-foreground truncate">{{ currentSession.description }}</span>
-          </div>3
+          </div>
         </div>
         <Badge :variant="getStatusVariant(currentSession.status)" class="shrink-0">
           {{ currentSession.status }}
@@ -86,6 +86,38 @@
         </div>
       </div>
 
+      <!-- Tool Execution Status - Show independently when exploring codebase -->
+      <div v-if="activeToolExecution && (activeToolExecution.status === 'executing' || activeToolExecution.status === 'investigating')" class="flex justify-start">
+        <div class="max-w-[80%] rounded-lg p-4 bg-muted">
+          <div class="flex items-center gap-2 mb-2">
+            <Avatar class="h-6 w-6">
+              <AvatarFallback
+                :style="currentAgentConfig
+                  ? { backgroundColor: currentAgentConfig.avatar_color }
+                  : { backgroundColor: '#6366f1' }"
+              >
+                <span v-if="currentAgentConfig && isEmoji(currentAgentConfig.avatar_url || '')" class="text-base">
+                  {{ currentAgentConfig.avatar_url }}
+                </span>
+                <img
+                  v-else-if="currentAgentConfig?.avatar_url"
+                  :src="currentAgentConfig.avatar_url"
+                  alt="avatar"
+                  class="w-full h-full object-cover"
+                />
+                <Bot v-else class="h-5 w-5" />
+              </AvatarFallback>
+            </Avatar>
+            <span class="text-xs font-semibold">
+              {{ currentAgentConfig?.display_name || 'Claude' }}
+            </span>
+          </div>
+          <div class="space-y-2">
+            <ToolExecutionStatus />
+          </div>
+        </div>
+      </div>
+
       <!-- Streaming Message or Waiting for Response -->
       <div v-if="store.streamingMessageId || waitingForResponse" class="flex justify-start">
         <div class="max-w-[80%] rounded-lg p-4 bg-muted">
@@ -125,10 +157,6 @@
                 @skip="handleSkip"
               />
             </template>
-            <!-- Tool Execution Status -->
-            <ToolExecutionStatus
-              v-if="activeToolExecution?.status === 'executing' || activeToolExecution?.status === 'investigating'"
-            />
             <div v-if="store.pendingBlocks.length === 0 && !isExploring" class="flex items-center gap-2 text-sm text-muted-foreground">
               <div class="flex gap-1">
                 <div class="w-2 h-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]"></div>
@@ -343,7 +371,7 @@ function handleServerMessage(data: WSServerMessage) {
       store.setToolExecuting({
         tool_name: (data as any).tool_name,
         exploration_id: (data as any).exploration_id,
-        status: (data as any).status as 'pending' | 'executing' | 'completed' | 'failed',
+        status: (data as any).status as 'pending' | 'executing' | 'investigating' | 'completed' | 'failed',
         message: (data as any).message,
         started_at: new Date().toISOString()
       })

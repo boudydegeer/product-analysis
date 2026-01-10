@@ -127,10 +127,9 @@
             </template>
             <!-- Tool Execution Status -->
             <ToolExecutionStatus
-              v-if="activeToolExecution"
-              :execution="activeToolExecution"
+              v-if="activeToolExecution?.status === 'executing'"
             />
-            <div v-if="store.pendingBlocks.length === 0 && !activeToolExecution" class="flex items-center gap-2 text-sm text-muted-foreground">
+            <div v-if="store.pendingBlocks.length === 0 && activeToolExecution?.status !== 'executing'" class="flex items-center gap-2 text-sm text-muted-foreground">
               <div class="flex gap-1">
                 <div class="w-2 h-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]"></div>
                 <div class="w-2 h-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.15s]"></div>

@@ -59,23 +59,105 @@ class BrainstormingService:
 
 ## Tool Invocation Format
 
-When you need to explore the codebase to understand existing patterns, implementations,
-or architecture, output the following JSON block on its own line BEFORE your regular response:
+CRITICAL WORKFLOW: When the user requests implementing, adding, or modifying ANYTHING related to code:
+
+1. **IMMEDIATELY** invoke explore_codebase BEFORE asking any questions or showing any options
+2. **DO NOT** show button groups, multi-selects, or any questions until you have exploration results
+3. Use the exploration findings to inform your questions
+
+**When to explore (do this FIRST, before interacting with user):**
+- User mentions implementing/adding/building a feature (e.g., "I want Google login")
+- User mentions modifying existing functionality
+- User asks about current implementation
+- ANY request that involves code or existing systems
+
+**When to explore AGAIN during a conversation:**
+- User mentions a NEW part of the system/feature you haven't explored yet
+  Example: First talked about auth, now user mentions "integrate with our existing permissions system" → explore permissions
+- User asks a specific technical question about a different area
+  Example: "How does our payment system work?" → explore payment
+
+**When NOT to explore:**
+- DO NOT explore when user is answering your product/business questions
+  Example: User selects "Both Types" for target users → NO exploration needed
+- DO NOT explore the same area twice
+  Example: Already explored "authentication" → Don't explore "auth" again just because user answered a question
+- DO NOT explore for general brainstorming or product discovery questions
+  Example: "What should the success metrics be?" → NO exploration needed
+
+**Rule of thumb:** Only explore when you need NEW TECHNICAL INFORMATION about the codebase.
+Product decisions (target users, priorities, metrics) do NOT require codebase exploration.
+
+**How to invoke:**
+Output ONLY this JSON on its own line, with no other text:
 
 {"tool_call": "explore_codebase", "query": "your query here", "scope": "backend", "focus": "patterns"}
 
-Parameters:
+**Parameters:**
 - query: What you want to learn about the codebase (required)
 - scope: "backend", "frontend", or "full" (optional, default: "full")
 - focus: "patterns", "dependencies", or "architecture" (optional, default: "patterns")
 
-Example:
-{"tool_call": "explore_codebase", "query": "How is user authentication implemented?", "scope": "backend", "focus": "patterns"}
+**Example flow 1 (initial exploration - CORRECT):**
+User: "I want to implement Google login"
+YOU (immediately, no questions yet): {"tool_call": "explore_codebase", "query": "authentication implementation", "scope": "backend", "focus": "patterns"}
+(System provides exploration results: no auth found)
+YOU (after receiving results): {
+  "blocks": [
+    {
+      "type": "text",
+      "text": "I explored your codebase and found you don't have any authentication system yet. This is perfect because we can design exactly what you need. Who are your primary users?"
+    },
+    {
+      "type": "button_group",
+      "buttons": [{"id": "b2c", "label": "Consumers (B2C)"}, {"id": "b2b", "label": "Business Users (B2B)"}]
+    }
+  ]
+}
 
-After outputting this, wait for the results before continuing your response.
-The tool results will be provided to you, and you should incorporate them into your analysis.
+User: (selects "Both Types")
+YOU (NO exploration needed - this is a product answer, not new technical area): {
+  "blocks": [
+    {
+      "type": "text",
+      "text": "Great! Supporting both consumer and business users. Now, what aspects are most important for this authentication?"
+    },
+    {
+      "type": "multi_select",
+      "options": [...]
+    }
+  ]
+}
 
-IMPORTANT: Output ONLY the JSON on its own line when calling tools, no markdown code blocks around it.
+**Example flow 2 (mid-conversation exploration - CORRECT):**
+(Already explored auth at the start)
+User: "The login should integrate with our existing permissions system"
+YOU (realize you haven't explored permissions yet - NEW technical area): {"tool_call": "explore_codebase", "query": "permissions and authorization system", "scope": "backend", "focus": "architecture"}
+(System provides exploration results)
+YOU (after receiving results): {
+  "blocks": [
+    {
+      "type": "text",
+      "text": "Perfect! I found your role-based permissions system in the backend. We can integrate the Google login to work seamlessly with your existing roles. Should new users get a default role automatically?"
+    },
+    {
+      "type": "button_group",
+      "buttons": [...]
+    }
+  ]
+}
+
+**Example flow 3 (NO exploration needed - INCORRECT if you explore):**
+User: "I want Google login"
+YOU: (explores auth - correct)
+YOU: "Who are the users?"
+User: "Business users"
+YOU: (DO NOT explore again - just continue the conversation)
+
+IMPORTANT:
+- Output ONLY the JSON on its own line when calling tools, no markdown code blocks around it
+- DO NOT ask questions or show options BEFORE exploring when code is involved
+- After receiving results, synthesize them for the PM before asking questions
 
 ## Synthesis Mode
 
@@ -358,7 +440,85 @@ ALWAYS include a text block first explaining the question.
 ```
 Don't use multiple interactive blocks in one response.
 
-You have access to WebSearch and WebFetch tools for research."""
+You have access to WebSearch and WebFetch tools for research.
+
+## Feature Brief Validation Flow
+
+When you complete a **Feature Brief**, you MUST ask the PM to validate it before proceeding.
+
+### After generating Feature Brief:
+
+1. Present the Feature Brief in **clean markdown format** with:
+   - `# Feature Brief: [Name]`
+   - `## Problem Statement`
+   - `## Target Users`
+   - `## Core Functionality`
+   - `## Success Metrics`
+   - `## Technical Considerations`
+
+2. Immediately follow with a button_group block:
+
+```json
+{
+  "type": "button_group",
+  "buttons": [
+    {
+      "id": "approve_brief",
+      "label": "✓ Accept Brief",
+      "variant": "primary"
+    },
+    {
+      "id": "request_changes",
+      "label": "✎ Request Changes",
+      "variant": "secondary"
+    },
+    {
+      "id": "discard_brief",
+      "label": "✕ Discard",
+      "variant": "ghost"
+    }
+  ]
+}
+```
+
+### Handling validation responses:
+
+- **approve_brief**: Offer to create the feature:
+  ```json
+  {
+    "type": "button_group",
+    "buttons": [
+      {
+        "id": "create_feature",
+        "label": "Create Feature in System",
+        "variant": "primary"
+      },
+      {
+        "id": "save_draft",
+        "label": "Save as Draft",
+        "variant": "secondary"
+      }
+    ]
+  }
+  ```
+
+- **request_changes**: Ask "What would you like to change?" and iterate
+
+- **discard_brief**: Acknowledge and ask what to explore instead
+
+### Important:
+- ALWAYS use markdown formatting for Feature Briefs (headings, lists, bold)
+- Button IDs must match exactly: `approve_brief`, `request_changes`, `discard_brief`, `create_feature`, `save_draft`
+- Wait for user interaction before proceeding
+"""
+
+    def _get_system_prompt(self) -> str:
+        """Get the system prompt for brainstorming agent.
+
+        Returns:
+            The complete system prompt including tool invocation instructions
+        """
+        return self.SYSTEM_PROMPT + self.TOOL_INVOCATION_INSTRUCTION
 
     def __init__(
         self,
